@@ -6,6 +6,9 @@ from cnn_utils import CNNBlock, ResidualBlock
 '''
 Darknet53 feature detector from Yolov3 object detection model
 config file: https://github.com/pjreddie/darknet/blob/master/cfg/darknet53.cfg
+architecture inspirations:
+    (Aladdin Persson): https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/model.py#L152
+    (Ayoosh Kathuria): https://github.com/ayooshkathuria/pytorch-yolo-v3/blob/master/darknet.py#L435
 
 '''
 
@@ -41,26 +44,38 @@ class Darknet(nn.Module):
 
 
     # ------------------------------------------------------
+    # From config stored in self.config constructs Darknet53,
+    # uses CNNBlock and ResidualBlock imported from cnn_utils
     def _constructDarknet53(self):
 
         in_channels = self.in_channels
         darknet = nn.Sequential()
         for block in self.config:
 
+            # Construction of CNNBlock and integration to darknet
             if isinstance(block, tuple):
                 out_channels, kernel_size, stride = block
-                padding = 1 if kernel_size == 3 else 0
                 cnn_block = nn.Sequential(
-                    CNNBlock(in_channels, out_channels, kernel_size, stride, padding=padding)
+                    CNNBlock(
+                        in_channels, 
+                        out_channels, 
+                        kernel_size, 
+                        stride, 
+                        padding=1 if kernel_size == 3 else 0
+                    )
                 )
 
                 in_channels = out_channels
                 darknet = nn.Sequential(*darknet, *cnn_block)
 
-            if isinstance(block, list):
+            # Construction of ResidualBlock and integration to darknet
+            elif isinstance(block, list):
                 block_type, num_of_repeats = block
                 res_block = nn.Sequential(
-                    ResidualBlock(num_of_repeats, in_channels)
+                    ResidualBlock(
+                        num_of_repeats, 
+                        in_channels
+                    )
                 )
 
                 darknet = nn.Sequential(*darknet, *res_block)
