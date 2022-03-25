@@ -127,8 +127,14 @@ if __name__ == '__main__':
     # out = res(out)
     # print(out.shape)    
 
-    from load import weights
-    t = torch.rand(1, 3, 256, 256)
-    cnn = CNNBlock(3, 32, kernel_size=3, stride=1, padding=1)
 
-    cnn.loadWeights(weights)
+
+    t = torch.rand(1, 3, 256, 256)
+
+    darknet53_path = 'pretrained/darknet53.conv.74'
+    w = WeightsHandler(darknet53_path)
+
+    cnn = CNNBlock(3, 32, kernel_size=3, stride=1, padding=1)
+    print(cnn.block[0].weight[31, 2, 2, 2])
+    cnn.loadWeights(w)
+    print(cnn.block[0].weight[31, 2, 2, 2])
