@@ -1,8 +1,9 @@
 '''
+Loading weights from PJ Redmon's darknet53.conv.74 file
 Inspiration/sources: 
-(loading weights from PJ Redmon's darknet53.conv.74 file available from https://pjreddie.com/media/files/darknet53.conv.74)
-https://github.com/eriklindernoren/PyTorch-YOLOv3/blob/e54d52e6500b7bbd687769f7abfd8581e9f59fd1/pytorchyolo/models.py#L199
-https://github.com/ayooshkathuria/pytorch-yolo-v3/blob/master/darknet.py#L385
+    (darknet53.conv.74) https://pjreddie.com/media/files/darknet53.conv.74
+    (Erik Lindernoren) https://github.com/eriklindernoren/PyTorch-YOLOv3/blob/e54d52e6500b7bbd687769f7abfd8581e9f59fd1/pytorchyolo/models.py#L199
+    (Ayoosh Kathuria) https://github.com/ayooshkathuria/pytorch-yolo-v3/blob/master/darknet.py#L385
 '''
 
 
@@ -23,7 +24,7 @@ import numpy as np
 # ------------------------------------------------------
 class WeightsHandler:
     def __init__(self, src: str):
-        self.pointer = 0
+        self.ptr = 0 # pointer to data
         self.header, self.weights = self._loadWeightsFromFile(src)
 
 
@@ -48,15 +49,4 @@ class WeightsHandler:
         weights = self.weights[self.ptr:self.ptr + number_of_values]
         self.ptr += number_of_values
 
-        return torch.from_numpy(np_weights)
-
-
-
-    # # ------------------------------------------------------
-    # # return torch.tensor with needed number of weights
-    # def getValues(self, number_of_values: int, format: torch.tensor):
-
-    #     weights = self.weights[self.ptr:self.ptr + number_of_values]
-    #     self.ptr += number_of_values
-
-    #     return torch.from_numpy(weights).view_as(format)
+        return torch.from_numpy(weights)
