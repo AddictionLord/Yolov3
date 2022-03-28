@@ -37,7 +37,7 @@ config = [
 
 
 class Darknet(nn.Module):
-    def __init__(self, in_channels, config, pretrained=True):
+    def __init__(self, in_channels, pretrained=True, config=config):
         super(Darknet, self).__init__()
 
         self.in_channels = in_channels
