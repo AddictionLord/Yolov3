@@ -48,7 +48,6 @@ class CNNBlock(nn.Module):
             # TODO: Create two private fcns to load weights to Conv2d and BatchNorm
             # to make this fcn cleaner, two fcns are just for inside use
             if isinstance(layer, nn.Conv2d):
-
                 num_of_weights = layer.weight.numel()
                 cnn_weights = weights.getValues(num_of_weights)
                 layer.weight.data.copy_(cnn_weights.view_as(layer.weight.data))
@@ -59,8 +58,7 @@ class CNNBlock(nn.Module):
                     cnn_biases = weights.getValues(num_of_biases)
                     layer.weight.data.copy_(cnn_biases.view_as(layer.bias.data))
 
-            if isinstance(layer, nn.BatchNorm2d):
-
+            elif isinstance(layer, nn.BatchNorm2d):
                 # number of params are same for biases, weights, means and vars
                 num_of_parameters = layer.bias.numel()
 
@@ -103,6 +101,14 @@ class ResidualBlock(nn.Module):
         return self.block(x)
 
 
+    # ------------------------------------------------------
+    def loadWeights(self, weights: WeightsHandler):
+
+        for cnn_block in self.block:
+
+            cnn_block.loadWeights(weights)
+
+
 
 
 
@@ -138,3 +144,11 @@ if __name__ == '__main__':
     print(cnn.block[0].weight[31, 2, 2, 2])
     cnn.loadWeights(w)
     print(cnn.block[0].weight[31, 2, 2, 2])
+
+    # --------------------------------
+    w = WeightsHandler(darknet53_path)
+    res = ResidualBlock(4, 3)
+    print(res.block[0].block[0].weight[0, 2, 0, 0])
+    res.loadWeights(w)
+    print(res.block[0].block[0].weight[0, 2, 0, 0])
+
