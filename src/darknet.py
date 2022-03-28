@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 from cnn_utils import CNNBlock, ResidualBlock
+from weights_handler import WeightsHandler
 
 
 '''
@@ -40,6 +41,7 @@ class Darknet(nn.Module):
 
         self.in_channels = in_channels
         self.config = config
+        self.weights_handler = None
         self.darknet = self._constructDarknet53()
         self.loadPretrainedModel(darknet53_path) if pretrained else None
 
@@ -96,15 +98,12 @@ class Darknet(nn.Module):
     # Loading darknet53 weights from darknet53.conv.74 file
     def loadPretrainedModel(self, src):
 
-        # TODO: replace shit below with class WeightsHandler
-        # class Darknet is only one who carries WeightsHandler, others
-        # just use and forget it immediatly after
-        with open(src, 'rb') as darknet_weights:
+        # class Darknet is only one who carries WeightsHandler, 
+        # others just use and forget it immediatly after
+        self.weights_handler = WeightsHandler(src)
+        for layer in self.darknet:
 
-            header = np.fromfile(darknet_weights, dtype=np.int32, count=5)
-            weights = np.fromfile(darknet_weights, dtype=np.float32)
-
-            darknet_weights.close()
+            layer.loadWeights(self.weights_handler)
 
         print('Pretrained model (darknet53) weights loaded..')
 
