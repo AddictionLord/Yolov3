@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from cnn_utils import CNNBlock, ResidualBlock
-from weights_handler import WeightsHandler
+from blocks.cnn_block import CNNBlock
+from blocks.residual_block import ResidualBlock
+from utils.weights_handler import WeightsHandler
 
 
 '''
