@@ -11,11 +11,12 @@ from blocks.cnn_block import CNNBlock
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, num_of_repeats, in_channels):
+    def __init__(self, num_of_repeats, in_channels, residual=True):
         super(ResidualBlock, self).__init__()
         
+        self.residual = residual
         self.num_of_repeats = num_of_repeats
-        self.block = nn.Sequential()
+        self.block = nn.ModuleList()
         res_block = nn.Sequential(
             CNNBlock(in_channels, in_channels // 2, kernel_size=1, padding=0),
             CNNBlock(in_channels // 2, in_channels, kernel_size=3, padding=1)
@@ -23,13 +24,21 @@ class ResidualBlock(nn.Module):
 
         for repeat in range(num_of_repeats):
 
-            self.block = nn.Sequential(*self.block, *res_block)
+            self.block += res_block
 
 
     # ------------------------------------------------------
     def forward(self, x):
 
-        return self.block(x)
+        for layer in self.block:
+
+            if self.residual:
+                x += layer(x)
+
+            else:
+                x = layer(x)
+
+        return x
 
 
     # ------------------------------------------------------
