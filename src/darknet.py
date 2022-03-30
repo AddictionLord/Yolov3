@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from blocks.cnn_block import CNNBlock
-from blocks.residual_block import ResidualBlock
+from blocks.cnn_builder import CNNBuilder
 from utils.weights_handler import WeightsHandler
 
 
@@ -36,7 +35,7 @@ config = [
 ]
 
 
-class Darknet(nn.Module):
+class Darknet(nn.Module, CNNBuilder):
     def __init__(self, in_channels, pretrained=True, config=config):
         super(Darknet, self).__init__()
 
@@ -72,27 +71,17 @@ class Darknet(nn.Module):
         for block in self.config:
 
             # Construction of CNNBlock and integration to darknet
+            # CNNBlock changes number of channels - update:
             if isinstance(block, tuple):
                 out_channels, kernel_size, stride = block
-                layer = CNNBlock(
-                    in_channels, 
-                    out_channels,
-                    kernel_size=kernel_size, 
-                    stride=stride, 
-                    padding=1 if kernel_size == 3 else 0
-                )
-
-                # CNNBlock changes number of channels - update:
+                layer = self._buildCNNLayer(in_channels, block)
                 in_channels = out_channels
 
             # Construction of ResidualBlock and integration to darknet
             # ResidualBlock doesn't change number of channels (no update needed)
             elif isinstance(block, list):
                 block_type, num_of_repeats = block
-                layer = ResidualBlock(
-                    num_of_repeats, 
-                    in_channels
-                )
+                layer = self._buildResidualLayer(in_channels, block)
 
             darknet.append(layer)
 
@@ -149,6 +138,9 @@ def testDarknetOutputSize():
 # ------------------------------------------------------
 if __name__ == '__main__':
 
+    from blocks.cnn_block import CNNBlock
+    from blocks.residual_block import ResidualBlock
+
     d = Darknet(3, config)
     num_of_blocks = len(d.darknet)
     num_of_layers = 0
@@ -158,7 +150,7 @@ if __name__ == '__main__':
 
         print(type(block))
         if isinstance(block, ResidualBlock):
-            print(len(block.block))
+            # print(len(block.block))
             num_of_layers += len(block.block)
 
         else:
