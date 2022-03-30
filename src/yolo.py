@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 from darknet import Darknet
-from blocks.cnn_block import CNNBlock
+from blocks.cnn_builder import CNNBuilder
+
 
 '''
 Darknet53 feature detector from PJ Redmon's Yolov3 object detection model
@@ -58,7 +59,7 @@ config = [
 ]
 
 
-class Yolov3(nn.Module):
+class Yolov3(nn.Module, CNNBuilder):
     def __init__(self, config, in_channels=3, num_of_classes=6):
         super(Yolov3, self).__init__()
 
@@ -67,7 +68,7 @@ class Yolov3(nn.Module):
         self.num_of_classes = num_of_classes
 
         self.darknet = Darknet(in_channels, pretrained=True)
-        self.yolo = self._constructYolov3(config)
+        self.yolo = self._constructNeuralNetwork(config)
 
 
     # ------------------------------------------------------
@@ -81,26 +82,6 @@ class Yolov3(nn.Module):
         return x
 
 
-    # ------------------------------------------------------
-    def _constructYolov3(self):
-
-        yolo = nn.ModuleList()
-        for block in self.config:
-
-            # Construction of CNNBlock and integration to darknet
-            if isinstance(block, tuple):
-                out_channels, kernel_size, stride = block
-                layer = CNNBlock(
-                    in_channels, 
-                    out_channels,
-                    kernel_size=kernel_size, 
-                    stride=stride, 
-                    padding=1 if kernel_size == 3 else 0
-                )
-
-                # CNNBlock changes number of channels - update:
-                in_channels = out_channels
-
                 
 
 
@@ -109,4 +90,23 @@ class Yolov3(nn.Module):
 
 if __name__ == "__main__":
 
+    from blocks.cnn_block import CNNBlock
+    from blocks.residual_block import ResidualBlock
+
     y = Yolov3(config)
+    num_of_blocks = len(y.yolo)
+    num_of_layers = 0
+    print(f'Number of blocks: {num_of_blocks}')
+
+    for index, block in enumerate(y.yolo):
+
+        print(type(block))
+        if isinstance(block, ResidualBlock):
+            # print(len(block.block))
+            num_of_layers += len(block.block)
+
+        else:
+            num_of_layers += 1
+
+    print(num_of_layers)
+    
