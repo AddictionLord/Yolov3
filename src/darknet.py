@@ -43,7 +43,7 @@ class Darknet(nn.Module, CNNBuilder):
         self.config = config
         self.weights_handler = None
         self.concatenation = list()
-        self.darknet = self._constructDarknet53()
+        self.darknet = self._constructNeuralNetwork(config)
         self.loadPretrainedModel(darknet53_path) if pretrained else None
 
 
@@ -59,33 +59,6 @@ class Darknet(nn.Module, CNNBuilder):
                 self.concatenation.append(x)
 
         return x
-
-
-    # ------------------------------------------------------
-    # From config stored in self.config constructs Darknet53,
-    # uses CNNBlock and ResidualBlock imported from cnn_utils
-    def _constructDarknet53(self):
-
-        in_channels = self.in_channels
-        darknet = nn.ModuleList()
-        for block in self.config:
-
-            # Construction of CNNBlock and integration to darknet
-            # CNNBlock changes number of channels - update:
-            if isinstance(block, tuple):
-                out_channels, kernel_size, stride = block
-                layer = self._buildCNNLayer(in_channels, block)
-                in_channels = out_channels
-
-            # Construction of ResidualBlock and integration to darknet
-            # ResidualBlock doesn't change number of channels (no update needed)
-            elif isinstance(block, list):
-                block_type, num_of_repeats = block
-                layer = self._buildResidualLayer(in_channels, block)
-
-            darknet.append(layer)
-
-        return darknet
 
 
     # ------------------------------------------------------
