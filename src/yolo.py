@@ -31,6 +31,31 @@ config = [
 ]
 
 
+config = [
+    (512, 1, 1),
+    (1024, 3, 1),
+    ["R", 1],
+    (512, 1, 1),
+    "S",
+
+    (256, 1, 1),
+    "U",
+
+    (256, 1, 1),
+    (512, 3, 1),
+    ["R", 1],
+    (256, 1, 1),
+    "S",
+
+    (128, 1, 1),
+    "U",
+
+    (128, 1, 1),
+    (256, 3, 1),
+    ["R", 1],
+    (128, 1, 1),
+    "S"
+]
 
 
 class Yolov3(nn.Module):
@@ -48,13 +73,35 @@ class Yolov3(nn.Module):
     # ------------------------------------------------------
     def forward(self, x):
 
-        return self.yolo(self.darknet(x))
+        x = self.darknet(x)
+        for layer in self.yolo:
+
+            x = layer(x)
+
+        return x
 
 
     # ------------------------------------------------------
-    def _constructYolov3(self, config):
+    def _constructYolov3(self):
 
-        pass
+        yolo = nn.ModuleList()
+        for block in self.config:
+
+            # Construction of CNNBlock and integration to darknet
+            if isinstance(block, tuple):
+                out_channels, kernel_size, stride = block
+                layer = CNNBlock(
+                    in_channels, 
+                    out_channels,
+                    kernel_size=kernel_size, 
+                    stride=stride, 
+                    padding=1 if kernel_size == 3 else 0
+                )
+
+                # CNNBlock changes number of channels - update:
+                in_channels = out_channels
+
+                
 
 
 
