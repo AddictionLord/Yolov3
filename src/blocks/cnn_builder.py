@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from cnn_block import CNNBlock
+from blocks.cnn_block import CNNBlock
 from blocks.residual_block import ResidualBlock
 from blocks.scale_prediction_block import ScalePrediction
 
@@ -67,6 +67,8 @@ class CNNBuilder:
 
 
     # ------------------------------------------------------
+    # From config passed to method constructs CNN (Darknet53/Yolov3),
+    # uses CNNBlock, ResidualBlock and ScalePrediction from cnn_utils
     def _constructNeuralNetwork(self, config):
 
         in_channels = self.in_channels
@@ -97,6 +99,8 @@ class CNNBuilder:
 
 
     # ------------------------------------------------------
+    # CNNBlock changes number of channels, update:
+    # in_channels (for next layer) = out_channels (of this layer)
     def _buildCNNLayer(self, in_channels, block):
 
         out_channels, kernel_size, stride = block
@@ -114,6 +118,7 @@ class CNNBuilder:
     # ------------------------------------------------------
     # block_type == 'R' builds block with residual behaviour,
     # block_type == 'C' just stacks CNNBlock
+    # Residual layer doesn't change number of channels
     def _buildResidualLayer(self, in_channels, block):
 
         block_type, num_of_repeats = block
@@ -127,12 +132,16 @@ class CNNBuilder:
 
 
     # ------------------------------------------------------
+    # ScalePrediction layer doesn't change number of channels,
+    # output from this layer doesn't influence the network
     def _buildScalePredictionLayer(self, in_channels, num_of_classes):
 
         return ScalePrediction(in_channels, self.num_of_classes)
 
 
     # ------------------------------------------------------
+    # Scale prediction layer modifies number of channels,
+    # because of tensor concatenation right after this layer 
     def _buildUpsampleLayer(self, in_channels, block):
 
         scale_factor, _ = block
