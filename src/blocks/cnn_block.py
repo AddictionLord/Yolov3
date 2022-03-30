@@ -9,9 +9,6 @@ from utils.weights_handler import WeightsHandler
 
 
 
-# ------------------------------------------------------
-# 
-# ------------------------------------------------------
 class CNNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, batch_norm=True, **kwargs):
         super(CNNBlock, self).__init__()

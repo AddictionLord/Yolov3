@@ -37,6 +37,10 @@ class Yolov3(nn.Module):
     def __init__(self, config, in_channels=3, num_of_classes=6):
         super(Yolov3, self).__init__()
 
+        self.config = config
+        self.in_channels = in_channels
+        self.num_of_classes = num_of_classes
+
         self.darknet = Darknet(in_channels, pretrained=True)
         self.yolo = self._constructYolov3(config)
 

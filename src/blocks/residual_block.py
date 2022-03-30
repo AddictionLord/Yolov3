@@ -10,13 +10,11 @@ from blocks.cnn_block import CNNBlock
 
 
 
-# ------------------------------------------------------  
-#   
-# ------------------------------------------------------    
 class ResidualBlock(nn.Module):
     def __init__(self, num_of_repeats, in_channels):
         super(ResidualBlock, self).__init__()
         
+        self.num_of_repeats = num_of_repeats
         self.block = nn.Sequential()
         res_block = nn.Sequential(
             CNNBlock(in_channels, in_channels // 2, kernel_size=1, padding=0),

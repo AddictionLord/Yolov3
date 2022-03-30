@@ -43,6 +43,7 @@ class Darknet(nn.Module):
         self.in_channels = in_channels
         self.config = config
         self.weights_handler = None
+        self.concatenation = list()
         self.darknet = self._constructDarknet53()
         self.loadPretrainedModel(darknet53_path) if pretrained else None
 
@@ -139,11 +140,21 @@ if __name__ == '__main__':
 
     d = Darknet(3, config)
     num_of_blocks = len(d.darknet)
+    num_of_layers = 0
     print(f'Number of blocks: {num_of_blocks}')
 
     for index, block in enumerate(d.darknet):
 
         print(type(block))
+        if isinstance(block, ResidualBlock):
+            print(len(block.block))
+            num_of_layers += len(block.block)
+
+        else:
+            num_of_layers += 1
+
+
+    print(num_of_layers)
 
 
     
