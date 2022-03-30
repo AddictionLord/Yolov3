@@ -52,7 +52,6 @@ class CNNBlock(nn.Module):
                 layer.weight.data.copy_(cnn_weights.view_as(layer.weight.data))
 
                 if not self.batch_norm:
-                
                     num_of_biases = layer.bias.numel()
                     cnn_biases = weights.getValues(num_of_biases)
                     layer.weight.data.copy_(cnn_biases.view_as(layer.bias.data))

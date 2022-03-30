@@ -49,9 +49,17 @@ class Darknet(nn.Module):
 
 
     # ------------------------------------------------------
+    # Iterates over all layers, saves tensors after ResidualBlock
+    # with 8 repeats to concatenate tensor later (route connections)
     def forward(self, x):
 
-        return self.darknet(x)
+        for layer in self.darknet:
+
+            x = layer(x)
+            if isinstance(layer, ResidualBlock) and layer.num_of_repeats == 8:
+                self.concatenation.append(x)
+
+        return x
 
 
     # ------------------------------------------------------
@@ -60,38 +68,33 @@ class Darknet(nn.Module):
     def _constructDarknet53(self):
 
         in_channels = self.in_channels
-        darknet = nn.Sequential()
+        darknet = nn.ModuleList()
         for block in self.config:
 
             # Construction of CNNBlock and integration to darknet
             if isinstance(block, tuple):
                 out_channels, kernel_size, stride = block
-                cnn_block = nn.Sequential(
-                    CNNBlock(
-                        in_channels, 
-                        out_channels,
-                        kernel_size=kernel_size, 
-                        stride=stride, 
-                        padding=1 if kernel_size == 3 else 0
-                    )
+                layer = CNNBlock(
+                    in_channels, 
+                    out_channels,
+                    kernel_size=kernel_size, 
+                    stride=stride, 
+                    padding=1 if kernel_size == 3 else 0
                 )
 
                 # CNNBlock changes number of channels - update:
                 in_channels = out_channels
-                darknet = nn.Sequential(*darknet, *cnn_block)
 
             # Construction of ResidualBlock and integration to darknet
             # ResidualBlock doesn't change number of channels (no update needed)
             elif isinstance(block, list):
                 block_type, num_of_repeats = block
-                res_block = nn.Sequential(
-                    ResidualBlock(
-                        num_of_repeats, 
-                        in_channels
-                    )
+                layer = ResidualBlock(
+                    num_of_repeats, 
+                    in_channels
                 )
 
-                darknet = nn.Sequential(*darknet, *res_block)
+            darknet.append(layer)
 
         return darknet
 
@@ -108,6 +111,14 @@ class Darknet(nn.Module):
             layer.loadWeights(self.weights_handler)
 
         print('Pretrained model (darknet53) weights loaded..')
+
+
+    # ------------------------------------------------------
+    # From darknet53 there are route connections after 
+    # ResidualBlocks with 8 repeats, this method 
+    def getTensorToConcatenate():
+
+        return self.concatenation.pop(0)
 
 
 
@@ -155,6 +166,7 @@ if __name__ == '__main__':
 
 
     print(num_of_layers)
+
 
 
     
