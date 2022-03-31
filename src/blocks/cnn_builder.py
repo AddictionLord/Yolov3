@@ -71,9 +71,6 @@ class CNNBuilder:
     # uses CNNBlock, ResidualBlock and ScalePrediction from cnn_utils
     def _constructNeuralNetwork(self, config, in_channels):
 
-        # print(self.in_channels)
-
-        # in_channels = self.in_channels
         net = nn.ModuleList()
         for block in self.config:
 
