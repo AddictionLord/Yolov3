@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+from blocks.residual_block import ResidualBlock
 from blocks.cnn_builder import CNNBuilder
 from utils.weights_handler import WeightsHandler
 
@@ -43,7 +44,7 @@ class Darknet(nn.Module, CNNBuilder):
         self.config = config
         self.weights_handler = None
         self.concatenation = list()
-        self.darknet = self._constructNeuralNetwork(config)
+        self.darknet = self._constructNeuralNetwork(config, in_channels)
         self.loadPretrainedModel(darknet53_path) if pretrained else None
 
 
@@ -78,9 +79,9 @@ class Darknet(nn.Module, CNNBuilder):
     # ------------------------------------------------------
     # From darknet53 there are route connections after 
     # ResidualBlocks with 8 repeats, this method 
-    def getTensorToConcatenate():
+    def getTensorToConcatenate(self):
 
-        return self.concatenation.pop(0)
+        return self.concatenation.pop()
 
 
 
@@ -103,13 +104,8 @@ def testDarknetOutputSize():
     print('Test was successful - Image output size is correct!')
 
 
-
-
-
 # ------------------------------------------------------
-# Main - mostly for testing purposes
-# ------------------------------------------------------
-if __name__ == '__main__':
+def showDarknetBlocks():
 
     from blocks.cnn_block import CNNBlock
     from blocks.residual_block import ResidualBlock
@@ -122,15 +118,17 @@ if __name__ == '__main__':
     for index, block in enumerate(d.darknet):
 
         print(type(block))
-        if isinstance(block, ResidualBlock):
-            # print(len(block.block))
-            num_of_layers += len(block.block)
-
-        else:
-            num_of_layers += 1
 
 
-    print(num_of_layers)
+
+
+# ------------------------------------------------------
+# Main - mostly for testing purposes
+# ------------------------------------------------------
+if __name__ == '__main__':
+
+    showDarknetBlocks()
+    testDarknetOutputSize()
 
 
 
