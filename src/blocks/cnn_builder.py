@@ -43,14 +43,14 @@ yolo = [
     (512, 1, 1),
     "S",
     (256, 1, 1),
-    {"U", 2},
+    {"U": 2},
     (256, 1, 1),
     (512, 3, 1),
     ["C", 1],
     (256, 1, 1),
     "S",
     (128, 1, 1),
-    {"U", 2},
+    {"U": 2},
     (128, 1, 1),
     (256, 3, 1),
     ["C", 1],
@@ -69,9 +69,11 @@ class CNNBuilder:
     # ------------------------------------------------------
     # From config passed to method constructs CNN (Darknet53/Yolov3),
     # uses CNNBlock, ResidualBlock and ScalePrediction from cnn_utils
-    def _constructNeuralNetwork(self, config):
+    def _constructNeuralNetwork(self, config, in_channels):
 
-        in_channels = self.in_channels
+        # print(self.in_channels)
+
+        # in_channels = self.in_channels
         net = nn.ModuleList()
         for block in self.config:
 
@@ -90,10 +92,12 @@ class CNNBuilder:
                 layer = self._buildScalePredictionLayer(in_channels, self.num_of_classes)
 
             # Construction of Upsampling block
-            elif isinstance(block, set):
+            elif isinstance(block, dict):
                 layer, in_channels = self._buildUpsampleLayer(in_channels, block)
 
             net.append(layer)
+            
+        self.out_channels = in_channels
 
         return net
 
@@ -144,14 +148,17 @@ class CNNBuilder:
     # because of tensor concatenation right after this layer 
     def _buildUpsampleLayer(self, in_channels, block):
 
-        scale_factor, _ = block
-
-        return nn.Upsample(scale_factor=scale_factor), in_channels * 3
+        return nn.Upsample(scale_factor=block["U"]), in_channels * 3
 
 
 
 
 if __name__ == '__main__':
+
+
+    from cnn_block import CNNBlock
+    from residual_block import ResidualBlock
+    from scale_prediction_block import ScalePrediction
 
     b = CNNBuilder(3, 6)
     net = b._constructNeuralNetwork(yolo)
