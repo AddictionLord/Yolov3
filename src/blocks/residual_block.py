@@ -24,7 +24,8 @@ class ResidualBlock(nn.Module):
 
         for repeat in range(num_of_repeats):
 
-            self.block += res_block
+            # self.block += nn.Sequential(res_block)
+            self.block.append(res_block)
 
 
     # ------------------------------------------------------
@@ -44,9 +45,10 @@ class ResidualBlock(nn.Module):
     # ------------------------------------------------------
     def loadWeights(self, weights: WeightsHandler):
 
-        for cnn_block in self.block:
+        for sequential_block in self.block:
+            for cnn_block in sequential_block:
 
-            cnn_block.loadWeights(weights)
+                cnn_block.loadWeights(weights)
 
 
 
@@ -64,22 +66,31 @@ if __name__ == '__main__':
     # padding = 1 if kernel_size == 3 else 0
 
     # pre = nn.Sequential(
-    #     CNNBlock(3, 32, 3, stride=1, padding=padding),
-    #     CNNBlock(32, 64, 3, stride=2, padding=padding)
+    #     CNNBlock(3, 32, kernel_size=3, stride=1, padding=padding),
+    #     CNNBlock(32, 64, kernel_size=3, stride=2, padding=padding)
     # )
     # out = pre(t)
     # print(out.shape)
 
-    # res = ResidualBlock(1, 64)
+    # res = ResidualBlock(1, 64, False)
     # out = res(out)
     # print(out.shape)    
+
+    # --------------------------------
+    t = torch.rand(1, 64, 256, 256)
+
+    res = ResidualBlock(1, 64)
+    out = res(t)
+
+    print(out.shape)
+
 
     # --------------------------------
     darknet53_path = './pretrained/darknet53.conv.74'
     w = WeightsHandler(darknet53_path)
 
     res = ResidualBlock(4, 3)
-    print(res.block[0].block[0].weight[0, 2, 0, 0])
+    print(res.block[0][0].block[0].weight[0, 2, 0, 0])
     res.loadWeights(w)
-    print(res.block[0].block[0].weight[0, 2, 0, 0])
+    print(res.block[0][0].block[0].weight[0, 2, 0, 0])
 
