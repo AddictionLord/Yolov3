@@ -59,10 +59,6 @@ class Yolov3(nn.Module, CNNBuilder):
         x = self.darknet(x)
         for layer in self.yolo:
 
-            # print(x.shape)
-            print(type(layer))
-            # print(layer.block)
-
             # Scale prediction outputs prediction tensor, but don't 
             # influence next layers, thus continuation after
             if isinstance(layer, ScalePrediction):
@@ -109,9 +105,9 @@ def testYoloOutputSize():
 
     out = model(t)
 
-    # assert out[0].shape == (BATCH_SIZE, 1024, INPUT_WIDTH // 32, INPUT_HEIGHT // 32, num_of_classes + 5)
-    # assert out[1].shape == (BATCH_SIZE, 1024, INPUT_WIDTH // 16, INPUT_HEIGHT // 16, num_of_classes + 5)
-    # assert out[2].shape == (BATCH_SIZE, 1024, INPUT_WIDTH // 8, INPUT_HEIGHT // 8, num_of_classes + 5)
+    assert out[0].shape == (BATCH_SIZE, 3, INPUT_WIDTH // 32, INPUT_HEIGHT // 32, num_of_classes + 5)
+    assert out[1].shape == (BATCH_SIZE, 3, INPUT_WIDTH // 16, INPUT_HEIGHT // 16, num_of_classes + 5)
+    assert out[2].shape == (BATCH_SIZE, 3, INPUT_WIDTH // 8, INPUT_HEIGHT // 8, num_of_classes + 5)
     print('Test was successful - Image output size is correct!')
 
 
