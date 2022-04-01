@@ -11,7 +11,7 @@ from blocks.cnn_block import CNNBlock
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, num_of_repeats, in_channels, residual=True):
+    def __init__(self, num_of_repeats: int, in_channels: int, residual=True):
         super(ResidualBlock, self).__init__()
         
         self.residual = residual
@@ -29,7 +29,7 @@ class ResidualBlock(nn.Module):
 
 
     # ------------------------------------------------------
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
 
         for layer in self.block:
 

@@ -41,7 +41,7 @@ config = [
 
 
 class Yolov3(nn.Module, CNNBuilder):
-    def __init__(self, config, in_channels=3, num_of_classes=6):
+    def __init__(self, config: list, in_channels=3, num_of_classes=6):
         super(Yolov3, self).__init__()
 
         self.config = config
@@ -53,7 +53,7 @@ class Yolov3(nn.Module, CNNBuilder):
 
 
     # ------------------------------------------------------
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
 
         outputs = list()
         x = self.darknet(x)

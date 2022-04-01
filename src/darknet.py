@@ -37,7 +37,7 @@ config = [
 
 
 class Darknet(nn.Module, CNNBuilder):
-    def __init__(self, in_channels, pretrained=True, config=config):
+    def __init__(self, in_channels: int, pretrained=True, config=config):
         super(Darknet, self).__init__()
 
         self.in_channels = in_channels
@@ -51,7 +51,8 @@ class Darknet(nn.Module, CNNBuilder):
     # ------------------------------------------------------
     # Iterates over all layers, saves tensors after ResidualBlock
     # with 8 repeats to concatenate tensor later (route connections)
-    def forward(self, x):
+    @torch.no_grad()
+    def forward(self, x: torch.tensor):
 
         for layer in self.darknet:
 
@@ -64,7 +65,7 @@ class Darknet(nn.Module, CNNBuilder):
 
     # ------------------------------------------------------
     # Loading darknet53 weights from darknet53.conv.74 file
-    def loadPretrainedModel(self, src):
+    def loadPretrainedModel(self, src: str):
 
         # class Darknet is only one who carries WeightsHandler, 
         # others just use and forget it immediatly after
@@ -129,6 +130,12 @@ if __name__ == '__main__':
 
     showDarknetBlocks()
     testDarknetOutputSize()
+
+    # t = torch.rand(1, 3, 255, 255, requires_grad=True)
+    # d = Darknet(3)
+
+    # out = d(t)
+    # print(out.requires_grad)    
 
 
 

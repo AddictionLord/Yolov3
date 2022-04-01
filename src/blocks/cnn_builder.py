@@ -59,7 +59,7 @@ yolo = [
 ]
 
 class CNNBuilder:
-    def __init__(self, in_channels, num_of_classes, config=yolo):
+    def __init__(self, in_channels: int, num_of_classes: int, config=yolo):
 
         self.in_channels = in_channels
         self.num_of_classes = num_of_classes
@@ -69,7 +69,7 @@ class CNNBuilder:
     # ------------------------------------------------------
     # From config passed to method constructs CNN (Darknet53/Yolov3),
     # uses CNNBlock, ResidualBlock and ScalePrediction from cnn_utils
-    def _constructNeuralNetwork(self, config, in_channels):
+    def _constructNeuralNetwork(self, config: list, in_channels: int):
 
         net = nn.ModuleList()
         for block in self.config:
@@ -102,7 +102,7 @@ class CNNBuilder:
     # ------------------------------------------------------
     # CNNBlock changes number of channels, update:
     # in_channels (for next layer) = out_channels (of this layer)
-    def _buildCNNLayer(self, in_channels, block):
+    def _buildCNNLayer(self, in_channels: int, block: tuple):
 
         out_channels, kernel_size, stride = block
         layer = CNNBlock(
@@ -120,7 +120,7 @@ class CNNBuilder:
     # block_type == 'R' builds block with residual behaviour,
     # block_type == 'C' just stacks CNNBlock
     # Residual layer doesn't change number of channels
-    def _buildResidualLayer(self, in_channels, block):
+    def _buildResidualLayer(self, in_channels: int, block: list):
 
         block_type, num_of_repeats = block
         layer = ResidualBlock(
@@ -135,7 +135,7 @@ class CNNBuilder:
     # ------------------------------------------------------
     # ScalePrediction layer doesn't change number of channels,
     # output from this layer doesn't influence the network
-    def _buildScalePredictionLayer(self, in_channels, num_of_classes):
+    def _buildScalePredictionLayer(self, in_channels: int, num_of_classes: int):
 
         return ScalePrediction(in_channels, self.num_of_classes)
 
@@ -143,7 +143,7 @@ class CNNBuilder:
     # ------------------------------------------------------
     # Scale prediction layer modifies number of channels,
     # because of tensor concatenation right after this layer 
-    def _buildUpsampleLayer(self, in_channels, block):
+    def _buildUpsampleLayer(self, in_channels: int, block: dict):
 
         return nn.Upsample(scale_factor=block["U"]), in_channels * 3
 

@@ -15,7 +15,7 @@ from blocks.cnn_block import CNNBlock
 #       --> N number of classes
 #       --> 5 for [probability, x, y, w, h]
 class ScalePrediction(nn.Module):
-    def __init__(self, in_channels, num_of_classes):
+    def __init__(self, in_channels: int, num_of_classes: int):
         super(ScalePrediction, self).__init__()
 
         self.num_of_classes = num_of_classes
@@ -31,7 +31,7 @@ class ScalePrediction(nn.Module):
     # reshape it to (B, A, N + 5, W, H)
     # permute to (B, A, W, H, N + 5)
     # Doesn't really matter, format just needs to be consistent (for loss etc..)
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
 
         return self.block(x).reshape(
             x.shape[0], 3, self.num_of_classes + 5, x.shape[2], x.shape[3]).permute(

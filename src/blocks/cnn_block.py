@@ -10,7 +10,7 @@ from utils.weights_handler import WeightsHandler
 
 
 class CNNBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, batch_norm=True, **kwargs):
+    def __init__(self, in_channels: int, out_channels: int, batch_norm=True, **kwargs):
         super(CNNBlock, self).__init__()
 
         self.batch_norm = batch_norm
@@ -32,7 +32,7 @@ class CNNBlock(nn.Module):
 
 
     # ------------------------------------------------------
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
 
         return self.block(x)
 
