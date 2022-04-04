@@ -17,7 +17,7 @@ class Dataset(CocoDetection):
     def __init__(self, 
         root: str, annFile: str, anchors: list, img_size=416, S=[13, 26, 52], C=6,transform=None
     ):
-        super(Dataset, self).__init__(root, annFile)
+        super(Dataset, self).__init__(root, annFile, transform)
 
         self.root = root
         self.annFile = annFile
@@ -45,21 +45,44 @@ class Dataset(CocoDetection):
     # ------------------------------------------------------
     # This is pytorch fcn, see pytorch docs for more
     # Returns List where each item is an object annotation
-    def _load_ann(self, id: int) -> list:
+    def _load_anns(self, id: int) -> list:
 
         return self.coco.loadAnns(self.coco.getAnnIds(self.ids[id]))
+
+
+    # ------------------------------------------------------
+    # Takes index and annotation file, calculate bbox values to
+    # range (0-1), appends class id, format: [x, y, w, h, class_id]
+    def _getBboxesFromAnns(self, anns: list, index: int) -> list:
+
+        img_info = self.coco.loadImgs(self.ids[index])[0]
+        width, height = img_info['width'], img_info['height']
+
+        bboxes = list()
+        for Object in anns:
+
+            bbox = Object['bbox']
+            normalized_bbox = [bbox[0]/width, bbox[1]/height, bbox[2]/width, bbox[3]/height]
+            normalized_bbox.append(Object['category_id'])
+            bboxes.append(normalized_bbox)
+
+        return bboxes
 
 
     # ------------------------------------------------------
     def __getitem__(self, index: int) -> tuple[any, any]:
 
         image = np.array(self._load_image(index))
-        ann = self._load_ann(index)
+        anns = self._load_anns(index)
+        bboxes = self._getBboxesFromAnns(anns, index)
 
         if self.transform:
-            image, ann = self.target_transform(image, ann)
+            augmentations = self.transform(image=image, bboxes=bboxes)
+            image, bboxes = augmentations["image"], augmentations["bboxes"]
 
-        return ann
+
+
+        return anns
 
 
 
@@ -73,14 +96,15 @@ if __name__ == '__main__':
     annots_path = 'dataset/instances_val2017.json'
 
     anchors = config.ANCHORS
+    transform = config.test_transforms
 
-    d = Dataset(data_path, annots_path, anchors)
+    d = Dataset(data_path, annots_path, anchors, transform=transform)
     train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
     i = iter(train_loader)
-    bbox = i.next()
-    print(type(bbox))
-    print(len(bbox))
+    bboxes = i.next()
+
+    # print(bboxes[0].keys())
 
 
 
