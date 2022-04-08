@@ -6,10 +6,14 @@ from torchvision.datasets import CocoDetection
 import os
 
 import config
+from utils import iouBetweenBboxAnchor
 
 
 '''
 https://pytorch.org/vision/master/_modules/torchvision/datasets/coco.html#CocoDetection.__getitem__
+https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/dataset.py
+https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-scratch-30ecb9751cb0
+
 '''
 
 
@@ -30,6 +34,8 @@ class Dataset(CocoDetection):
         self.S = S
         self.C = C
         self.transform = transform
+
+        self.iou_thresh = 0.5
 
 
     # ------------------------------------------------------
@@ -70,7 +76,7 @@ class Dataset(CocoDetection):
 
 
     # ------------------------------------------------------
-    def __getitem__(self, index: int) -> tuple[any, any]:
+    def __getitem__(self, index: int) -> tuple[Image.Image, tuple]:
 
         image = np.array(self._load_image(index))
         anns = self._load_anns(index)
