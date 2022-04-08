@@ -11,27 +11,26 @@ class BoundingBox:
         bbox = bbox.view(-1, 4)
 
         if midpoint:
-            self.midpoint = bbox
-            self.corners = None
+            self.midpoint, self.corners = bbox, None
             self.x, self.y = self.midpoint[..., 0:1], self.midpoint[..., 1:2]
             self.w, self.h = self.midpoint[..., 2:3], self.midpoint[..., 3:4]
 
         else:
-            self.corners = bbox
-            self.midpoint = None
+            self.midpoint, self.corners = None, bbox
             self.x1, self.y1 = self.corners[..., 0:1], self.corners[..., 1:2]
             self.x2, self.y2 = self.corners[..., 2:3], self.corners[..., 3:4]
 
 
     # ------------------------------------------------------
-    # If bbox is in midpoint form, this recomputes coords to corners form
+    # If bbox is in midpoint form, this recomputes coords to corners form,
+    # [x1, y1] - left top, [x2, y2] - right bottom 
     def toCornersForm(self):
 
         if self.corners is None:
             self.x1 = (self.x - self.w / 2)
-            self.y1 = (self.y + self.h / 2)
+            self.y1 = (self.y - self.h / 2)
             self.x2 = (self.x + self.w / 2)
-            self.y2 = (self.y - self.h / 2)
+            self.y2 = (self.y + self.h / 2)
             self.corners = torch.cat((self.x1, self.y1, self.x2, self.y2), dim=1)
 
         return self.corners
@@ -71,7 +70,7 @@ if __name__ == '__main__':
     bbox4 = b.toCornersForm()
     print(bbox4)
 
-    # assert bbox2[1, 2] == bbox4[1, 2]
+    assert bbox2[1, 2] == bbox4[1, 2]
 
 
 
