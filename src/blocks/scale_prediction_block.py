@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 sys.path.insert(1, '/home/mary/thesis/project/src/')
-from blocks.cnn_block import CNNBlock
+from blocks import CNNBlock
 
 
 

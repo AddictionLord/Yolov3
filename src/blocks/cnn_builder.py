@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+import sys
 
-from blocks.cnn_block import CNNBlock
-from blocks.residual_block import ResidualBlock
-from blocks.scale_prediction_block import ScalePrediction
+sys.path.insert(1, '/home/mary/thesis/project/src/')
+from blocks import CNNBlock
+from blocks import ResidualBlock
+from blocks import ScalePrediction
 
 
 darknet_config = [
@@ -152,13 +154,8 @@ class CNNBuilder:
 
 if __name__ == '__main__':
 
-
-    from cnn_block import CNNBlock
-    from residual_block import ResidualBlock
-    from scale_prediction_block import ScalePrediction
-
     b = CNNBuilder(3, 6)
-    net = b._constructNeuralNetwork(yolo)
+    net = b._constructNeuralNetwork(yolo, 3)
 
     for block in net:
 
