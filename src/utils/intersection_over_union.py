@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # box = [1, 2, 3, 4, 5]
     # iou = iouBetweenBboxAnchor(torch.tensor(box[2:4]), anch)
 
-    preds = torch.tensor([2, 2, 2, 4])
-    labels = torch.tensor([2, 2, 3, 4])    
+    preds = torch.tensor([[2, 2, 2, 4], [0, 0, 1, 1]])
+    labels = torch.tensor([[2, 2, 3, 4], [20, 20, 1, 1]])    
     iou1 = intersectionOverUnion(preds, labels)
-    print(iou1.item())
+    print(iou1)
