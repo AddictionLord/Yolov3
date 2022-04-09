@@ -8,7 +8,7 @@ class BoundingBox:
     def __init__(self, bbox: [torch.tensor, list], midpoint=True):
 
         bbox = torch.tensor(bbox) if isinstance(bbox, list) else bbox
-        bbox = bbox.view(-1, 4)
+        bbox = bbox[0:4].view(-1, 4)
 
         if midpoint:
             self.midpoint, self.corners = bbox, None
