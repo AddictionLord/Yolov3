@@ -73,11 +73,19 @@ def softNonMaxSuppression(
     return final
 
 
+
+
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-    bboxes = [[1, 0.7, 2, 2, 5, 4], [1, 0.4, 2, 2, 4.8, 4], [1, 0.9, 1.9, 1.8, 5, 4.5]]
+    bboxes = [
+        [1, 0.7, 2, 2, 5, 4], 
+        [1, 0.4, 2, 2, 4.8, 4], 
+        [1, 0.9, 1.9, 1.8, 5, 4.5]
+    ]
+    
     nms = nonMaxSuppression(bboxes, 0.5, 0.5)
-    print(f'Non-max suppression: {nms}')
     soft_nms = softNonMaxSuppression(bboxes, 0.5, 0.5)
-    print(f'Soft NMS: {soft_nms}')
+
+    print(f'Non-max suppression:\n{nms}')
+    print(f'Soft NMS:\n{soft_nms}')
