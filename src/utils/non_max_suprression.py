@@ -12,6 +12,7 @@ Sources/Inspirations:
 https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/utils.py 
 https://towardsdatascience.com/non-maximum-suppression-nms-93ce178e177c
 https://openaccess.thecvf.com/content_iccv_2017/html/Bodla_Soft-NMS_--_Improving_ICCV_2017_paper.html
+https://www.youtube.com/watch?v=VAo84c1hQX8
 '''
 
 
@@ -87,5 +88,5 @@ if __name__ == '__main__':
     nms = nonMaxSuppression(bboxes, 0.5, 0.5)
     soft_nms = softNonMaxSuppression(bboxes, 0.5, 0.5)
 
-    print(f'Non-max suppression:\n{nms}')
+    print(f'Non-max suppression:\n{nms}\n')
     print(f'Soft NMS:\n{soft_nms}')

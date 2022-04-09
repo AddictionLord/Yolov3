@@ -3,8 +3,14 @@ import albumentations as A
 import cv2
 from albumentations.pytorch import ToTensorV2
 
+'''
+https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-scratch-30ecb9751cb0
+
+'''
+
 IMAGE_SIZE = 416
 
+# Each list inside of ANCHORS correspond to specific prediction scale (3 scales)
 ANCHORS = [
     [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
     [(0.07, 0.15), (0.15, 0.11), (0.14, 0.29)],

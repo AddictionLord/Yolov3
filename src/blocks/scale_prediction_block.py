@@ -10,8 +10,8 @@ from blocks import CNNBlock
 
 
 # Scale predictior outputs:
-#   - number of channels = 3 * (N + 5)
-#       --> 3 anchor boxes
+#   - number of channels = A * (N + 5)
+#       --> A - anchor boxes (3)
 #       --> N number of classes
 #       --> 5 for [probability, x, y, w, h]
 class ScalePrediction(nn.Module):

@@ -5,7 +5,9 @@ sys.path.insert(1, '/home/mary/thesis/project/src/')
 from utils import BoundingBox
 import config
 
-
+''' 
+https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/utils.py
+'''
 
 
 # ------------------------------------------------------
@@ -13,8 +15,11 @@ import config
 # of bbox/anchor doesn't matter, here it's all about size (width, height)
 def iouBetweenBboxAnchor(bbox, anchor):
 
-    intersection = torch.min(bbox[..., 0], anchor[..., 0]) * torch.min(bbox[..., 1], anchor[..., 1])
-    union = bbox[..., 0] * bbox[..., 1] + anchor[..., 0] * anchor[..., 1] - intersection
+    intersection = torch.min(
+        bbox[..., 0], anchor[..., 0]) * torch.min(bbox[..., 1], anchor[..., 1]
+    )
+    union = (bbox[..., 0] * bbox[..., 1] 
+        + anchor[..., 0] * anchor[..., 1] - intersection)
 
     return intersection / union
 
@@ -70,4 +75,4 @@ if __name__ == '__main__':
     preds = torch.tensor([2, 2, 2, 4])
     labels = torch.tensor([2, 2, 3, 4])    
     iou1 = intersectionOverUnion(preds, labels)
-    print(iou1)
+    print(iou1.item())
