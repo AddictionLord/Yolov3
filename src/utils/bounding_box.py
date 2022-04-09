@@ -1,14 +1,28 @@
 import torch
 
 
+'''
+https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/utils.py
+'''
 
 
 # ------------------------------------------------------
+# TODO: Clean the constructor, make some format handling private fcns
 class BoundingBox:
     def __init__(self, bbox: [torch.tensor, list], midpoint=True):
 
         bbox = torch.tensor(bbox) if isinstance(bbox, list) else bbox
-        bbox = bbox[0:4].view(-1, 4)
+
+        # this is for format bbox: [x, y, w, h, class]
+        if bbox.shape[0] == 5:
+            self.classification = bbox[..., 4]
+            bbox = bbox[..., 0:4].view(-1, 4)
+
+        # this is for format bbox: [class, prob, x, y, w, h]
+        elif bbox.shape[0] == 6:
+            self.classification = bbox[..., 0]
+            self.probability = bbox[..., 1]
+            bbox = bbox[..., 2:6].view(-1, 4)
 
         if midpoint:
             self.midpoint, self.corners = bbox, None
@@ -52,6 +66,7 @@ class BoundingBox:
 
 
 
+# ------------------------------------------------------
 if __name__ == '__main__':
 
     # bbox = list([2, 2, 2, 4])
@@ -72,11 +87,7 @@ if __name__ == '__main__':
 
     assert bbox2[1, 2] == bbox4[1, 2]
 
-
-
-
-
-    # c = torch.tensor([1, 1])
-    # b = torch.tensor([2, 2])
-
-    # print(torch.cat((b, c), dim=-1))
+    print()
+    bbox = list([2, 2, 2, 4, 1])
+    b = BoundingBox(bbox)
+    print(b.classification.item())
