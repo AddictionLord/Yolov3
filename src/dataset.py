@@ -6,7 +6,7 @@ from torchvision.datasets import CocoDetection
 import os
 
 import config
-from utils import iouBetweenBboxAnchor
+from utils import iouBetweenBboxAnchor, nonMaxSuppression, BoundingBox
 
 
 '''
@@ -76,6 +76,7 @@ class Dataset(CocoDetection):
 
 
     # ------------------------------------------------------
+    # TODO: Clean up this function, make smaller function and call them
     def __getitem__(self, index: int) -> tuple[Image.Image, tuple]:
 
         image = np.array(self._load_image(index))
@@ -86,13 +87,89 @@ class Dataset(CocoDetection):
             augmentations = self.transform(image=image, bboxes=bboxes)
             image, bboxes = augmentations["image"], augmentations["bboxes"]
 
+        # 6 -> objectness score, x, y, w, h, classification
+        targets = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.S]
+        # Loop through all bboxes in the image and find best anchor
+        for box in bboxes:
+
+            # Finding best fit for bbox/anchor
+            ious = iouBetweenBboxAnchor(torch.tensor(box[2:4]), self.anchors)
+            ious_indices = torch.argsort(ious, dim=0, descending=True)
+            x, y, width, height, classification = box # bbox = BoundingBox(box)
+
+            # One object/Bbox corresponds to only one anchor per scale [0-2]
+            bbox_has_anchor = [False, False, False]
+            for iou_idx in ious_indices:
+
+                # This finds out which scale and anchor are we handling
+                scale = iou_idx // self.num_of_anchors_per_scale 
+                anchor = iou_idx % self.num_of_anchors_per_scale
+                
+                # Computing the specific cell in grid contains the bbox midpoint
+                cells = self.S[scale] # bbox.computeCell(self.S[scale])
+                cell_x, cell_y = int(x * cells), int(y * cells)
+
+                # One anchor can handle 1 object, if two objects have midpoint 
+                # in same cell, another anchor box can detect it
+                anchor_present = targets[scale][anchor, cell_y, cell_x, 0] 
+
+                # If no anchor is assigned to this cell: [cell_x, cell_y] and 
+                # this specific bbox has no anchor yet, we assign it:
+                if not anchor_present and not bbox_has_anchor[scale]:
+                    # Compute bbox: [x, y, w, h] relative to the cell
+                    x, y = x * cells - cell_x, y * cells - cell_y 
+                    width, height = width * cells, height * cells
+                    bbox = torch.tensor([x, y, width, height]) 
+
+                    # Assign all the data to target tensor
+                    targets[scale][anchor, cell_y, cell_x, 0] = 1
+                    targets[scale][anchor, cell_y, cell_x, 1:5] = bbox #bbox.relativeToCell()
+                    targets[scale][anchor, cell_y, cell_x, 5] = classification
+                    bbox_has_anchor[scale] = True
+
+                elif not anchor_present and ious[iou_idx] > self.iou_thresh:
+                    targets[scale][anchor, cell_y, cell_x, 0] = -1
+
+        return image, tuple(targets)
 
 
-        return anns
+
+
+# ------------------------------------------------------
+def test():
+
+    d = Dataset(data_path, annots_path, anchors, transform=transform)
+    train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
+
+    S = [13, 26, 52]
+    scaled_anchors = torch.tensor(anchors) / (
+        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
+    )
+
+    # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
+    for image, targets in train_loader:
+
+        boxes = list()
+        num_of_anchors = targets[0].shape[1] 
+        for i in range(num_of_anchors):
+
+            anchor = scaled_anchors[i]
+            print(anchor.shape)
+            print(targets[i].shape)
+            boxes += cells_to_bboxes(
+                targets[i], is_preds=False, S=y[i].shape[2], anchors=anchor
+            )[0]
+
+        boxes = nonMaxSuppression(
+            boxes, iou_threshold=1, threshold=0.7, box_format="midpoint"
+        )
+        print(boxes)
+        plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
 
 
 
 
+# ------------------------------------------------------
 if __name__ == '__main__':
 
 
@@ -104,13 +181,18 @@ if __name__ == '__main__':
     anchors = config.ANCHORS
     transform = config.test_transforms
 
-    d = Dataset(data_path, annots_path, anchors, transform=transform)
-    train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
+    test()
 
-    i = iter(train_loader)
-    bboxes = i.next()
+    # d = Dataset(data_path, annots_path, anchors, transform=transform)
+    # train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
-    # print(bboxes[0].keys())
+    # i = iter(train_loader)
+    # image, targets = i.next()
+
+    # print(targets[0][0, 0, :, :, 0])
+    # print(targets[1][0, 0, :, :, 0])
+    # print(targets[2][0, 0, :, :, 0])
+
 
 
 
