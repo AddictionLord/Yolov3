@@ -50,8 +50,6 @@ def intersectionOverUnion(
     return intersection / (box1_area + box2_area - intersection + 1e-6)
 
 
-
-
 # ------------------------------------------------------
 if __name__ == '__main__':
 
