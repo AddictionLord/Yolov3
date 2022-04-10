@@ -26,6 +26,43 @@ class BoundingBox:
 
 
     # ------------------------------------------------------
+    # Find which cell is midpoint and compute bbox: [x, y, w, h] relative to the cell
+    def computeCells(self, num_of_cells: int):
+
+        self.cells = num_of_cells
+        self.cx = int(self.x * self.cells)
+        self.cy = int(self.y * self.cells)
+
+        xrel_c = self.x * self.cells - self.cx
+        yrel_c = self.y * self.cells - self.cy
+        wrel_c = self.w * self.cells
+        hrel_c = self.h * self.cells
+
+        self.bb_cell_relative = torch.cat((xrel_c, yrel_c, wrel_c, hrel_c), dim=-1).reshape(-1, 4)
+
+        return self.cx, self.cy
+
+
+    # ------------------------------------------------------
+    # albumentations need [x, y, w, h, class] repre
+    def toTransform(self):
+
+        return torch.cat((self.bbox, self.classification), dim=-1).reshape(5).tolist()
+
+
+    # ------------------------------------------------------
+    # Used to normalize BB data (divide with width and height)
+    def normalize(self, width, height):
+
+        self.img_width, self.img_height = width, height
+        self.bbox[..., 0:1] /= width
+        self.bbox[..., 1:2] /= height
+        self.bbox[..., 2:3] /= width
+        self.bbox[..., 3:4] /= height
+        self._initForm(self.bbox)
+
+
+    # ------------------------------------------------------
     # Slice bbox according to allowed representation
     def _sliceBbox(self, bbox: torch.tensor):
 
@@ -40,12 +77,12 @@ class BoundingBox:
 
         # this is for bbox repre: [x, y, w, h, class]
         elif rows == 5 or cols == 5:
-            self.classification = bbox[..., 4]
+            self.classification = bbox[..., 4].view(-1, 1)
             bbox = bbox[..., 0:4].view(-1, 4)
 
         # this is for bbox repre: [class, prob, x, y, w, h]
         elif rows == 6 or cols == 6:
-            self.classification = bbox[..., 0]
+            self.classification = bbox[..., 0].view(-1, 1)
             self.probability = bbox[..., 1]
             bbox = bbox[..., 2:6].view(-1, 4)
 
@@ -101,10 +138,10 @@ class BoundingBox:
     # Parses Coco annotations
     def _parseAnnotations(self, anns: dict):
 
-        classification = anns['category_id']
         bbox = anns['bbox']
+        bbox.append(anns['category_id'])
 
-        return torch.tensor(bbox.append(classification))
+        return torch.tensor(bbox)
 
 
     # ------------------------------------------------------
