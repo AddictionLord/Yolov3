@@ -21,7 +21,7 @@ class Dataset(CocoDetection):
     def __init__(self, 
         root: str, annFile: str, anchors: list, img_size=416, S=[13, 26, 52], C=6,transform=None
     ):
-        super(Dataset, self).__init__(root, annFile, transform)
+        super(Dataset, self).__init__(root, annFile)
 
         self.root = root
         self.annFile = annFile
@@ -67,10 +67,24 @@ class Dataset(CocoDetection):
         for Object in anns:
 
             bbox = transformBboxCoords(torch.tensor(Object['bbox']))
-            print(Object['bbox'])
             normalized_bbox = [bbox[0]/width, bbox[1]/height, bbox[2]/width, bbox[3]/height]
             normalized_bbox.append(Object['category_id'])
             bboxes.append(normalized_bbox)
+
+        return bboxes
+
+
+    # ------------------------------------------------------
+    # Returns list of BoundingBox instances
+    def _parseAnnotations(self, anns: dict, index: int) -> list:
+
+        img_info = self.coco.loadImgs(self.ids[index])[0]
+        bboxes = list()
+        for Object in anns:
+
+            bbox = BoundingBox(Object, form='coco')
+            bbox.normalize(img_info['width'], img_info['height'])
+            bboxes.append(bbox.toTransform())
 
         return bboxes
 
@@ -80,16 +94,13 @@ class Dataset(CocoDetection):
     # use super().__getitem__(index) probably
     def __getitem__(self, index: int) -> tuple[Image.Image, tuple]:
 
-        image = np.array(self._load_image(index))
-        anns = self._load_anns(index)
-        bboxes = self._getBboxesFromAnns(anns, index)
-
-        plot_im(image, bboxes)
+        image, anns = super().__getitem__(index)
+        bboxes = self._parseAnnotations(anns, index)
+        image = np.array(image)
 
         if self.transform:
             augmentations = self.transform(image=image, bboxes=bboxes)
             image, bboxes = augmentations["image"], augmentations["bboxes"]
-
 
         # 6 -> objectness score, x, y, w, h, classification
         targets = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.S]
@@ -99,7 +110,7 @@ class Dataset(CocoDetection):
             # Finding best fit for bbox/anchor
             ious = iouBetweenBboxAnchor(torch.tensor(box[2:4]), self.anchors)
             ious_indices = torch.argsort(ious, dim=0, descending=True)
-            ix, iy, iwidth, iheight, classification = box # bbox = BoundingBox(box)
+            bbox = BoundingBox(list(box))
 
             # One object/Bbox corresponds to only one anchor per scale [0-2]
             bbox_has_anchor = [False, False, False] # 3 bools for 3 scales
@@ -110,29 +121,23 @@ class Dataset(CocoDetection):
                 anchor = iou_idx % self.num_of_anchors_per_scale
                 
                 # Computing the specific cell in grid contains the bbox midpoint
-                cells = self.S[scale] # bbox.computeCell(self.S[scale])
-                cell_x, cell_y = int(ix * cells), int(iy * cells)
+                cx, cy = bbox.computeCells(self.S[scale])
 
                 # One anchor can handle 1 object, if two objects have midpoint 
                 # in same cell, another anchor box can detect it
-                anchor_present = targets[scale][anchor, cell_y, cell_x, 0] 
+                anchor_present = targets[scale][anchor, cy, cx, 0] 
 
-                # If no anchor is assigned to this cell: [cell_x, cell_y] and 
+                # If no anchor is assigned to this cell: [cx - cell_x, cy - cell_y] and 
                 # this specific bbox has no anchor yet, we assign it:
                 if not anchor_present and not bbox_has_anchor[scale]:
-                    # Compute bbox: [x, y, w, h] relative to the cell
-                    x, y = ix * cells - cell_x, iy * cells - cell_y 
-                    width, height = iwidth * cells, iheight * cells
-                    bbox = torch.tensor([x, y, width, height]) 
-
                     # Assign all the data to target tensor
-                    targets[scale][anchor, cell_y, cell_x, 0] = 1
-                    targets[scale][anchor, cell_y, cell_x, 1:5] = bbox #bbox.relativeToCell()
-                    targets[scale][anchor, cell_y, cell_x, 5] = classification
+                    targets[scale][anchor, cy, cx, 0] = 1
+                    targets[scale][anchor, cy, cx, 1:5] = bbox.bb_cell_relative
+                    targets[scale][anchor, cy, cx, 5] = bbox.classification
                     bbox_has_anchor[scale] = True
 
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
-                    targets[scale][anchor, cell_y, cell_x, 0] = -1
+                    targets[scale][anchor, cy, cx, 0] = -1
 
         return image, tuple(targets)
 
@@ -143,7 +148,7 @@ class Dataset(CocoDetection):
 def test():
 
     d = Dataset(data_path, annots_path, anchors, transform=transform)
-    train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
     S = [13, 26, 52]
     scaled_anchors = torch.tensor(anchors) / (
@@ -164,11 +169,11 @@ def test():
                 targets[i], is_preds=False, S=targets[i].shape[2], anchors=anchor
             )[0]
             
-            # boxes = nonMaxSuppression(boxes, 0.6, 0.65, True)
-            boxes = nonMaxSuppression(boxes, 1, 0.7, True)
+            # boxes = nonMaxSuppression(boxes, 0.6, 0.65)
+            boxes = nonMaxSuppression(boxes, 1, 0.7)
         
-        print(torch.tensor(boxes))            
-        print(len(boxes))            
+        # print(torch.tensor(boxes))            
+        # print(len(boxes))            
         plot_image(image[0].permute(1, 2, 0).to('cpu'), boxes)
 
 
