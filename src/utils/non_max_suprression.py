@@ -25,7 +25,7 @@ def nonMaxSuppression(
     bboxes: list, 
     iou_thresh=0.5, 
     prob_threshold=0.5, 
-    midpoint_format=True
+    form='midpoint'
     ) -> list:
 
     # Filter all bboxes with probability under threshold score
@@ -41,7 +41,7 @@ def nonMaxSuppression(
         final.append(fittest_bbox)
         for box in bboxes:
 
-            iou = intersectionOverUnion(fittest_bbox, box, midpoint_format).item()
+            iou = intersectionOverUnion(fittest_bbox, box, form).item()
             bboxes.remove(box) if iou > iou_thresh else None
 
     return final
@@ -55,7 +55,7 @@ def softNonMaxSuppression(
     bboxes: list, 
     iou_thresh=0.5, 
     prob_threshold=0.5, 
-    midpoint_format=True
+    form='midpoint'
     ) -> list:
 
     # Filter all bboxes with probability under threshold score
@@ -70,7 +70,7 @@ def softNonMaxSuppression(
         final.append(fittest_bbox)
         for box in bboxes:
 
-            iou = intersectionOverUnion(fittest_bbox, box).item()
+            iou = intersectionOverUnion(fittest_bbox, box, form).item()
             box[1] = box[1] if iou < iou_thresh else box[1] * (1 - iou)
 
     return final

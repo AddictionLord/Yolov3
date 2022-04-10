@@ -28,13 +28,13 @@ def iouBetweenBboxAnchor(bbox, anchor):
 # Computes intersection, union and returns intersection/union
 # labels/pred in format midpoint: [x, y, w, h], corners: [x1, y1, x2, y2]
 def intersectionOverUnion(
-    preds: torch.tensor, labels: torch.tensor, midpoint_format=True
+    preds: torch.tensor, labels: torch.tensor, form='midpoint'
 ):
 
-    preds = BoundingBox(preds, midpoint=midpoint_format)
-    labels = BoundingBox(labels, midpoint=midpoint_format)
+    preds = BoundingBox(preds, form=form)
+    labels = BoundingBox(labels, form=form)
 
-    if midpoint_format:
+    if form == 'midpoint':
         preds.toCornersForm()
         labels.toCornersForm()
 
