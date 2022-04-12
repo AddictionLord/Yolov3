@@ -6,7 +6,7 @@ from torchvision.datasets import CocoDetection
 import os
 
 import config
-from utils import iouBetweenBboxAnchor, nonMaxSuppression, BoundingBox
+from utils import iouBetweenBboxAnchor, nonMaxSuppression, BoundingBox, TargetTensor
 
 
 '''
@@ -39,42 +39,6 @@ class Dataset(CocoDetection):
 
 
     # ------------------------------------------------------
-    # This is pytorch fcn, see pytorch docs for more
-    # Returns Image.Image object
-    def _load_image(self, index: int) -> Image.Image:
-
-        self.img_info = self.coco.loadImgs(self.ids[index])[0]
-        path = self.img_info["file_name"]
-
-        return Image.open(os.path.join(self.root, path)).convert("RGB")
-
-
-    # ------------------------------------------------------
-    # This is pytorch fcn, see pytorch docs for more
-    # Returns List where each item is an object annotation
-    def _load_anns(self, index: int) -> list:
-
-        return self.coco.loadAnns(self.coco.getAnnIds(self.ids[index]))
-
-
-    # ------------------------------------------------------
-    # Takes index and annotation file, normalize bbox values to
-    # range (0-1), appends class id, returns format: [x, y, w, h, class_id]
-    def _getBboxesFromAnns(self, anns: list, index: int) -> list:
-
-        width, height = self.img_info['width'], self.img_info['height']
-        bboxes = list()
-        for Object in anns:
-
-            bbox = transformBboxCoords(torch.tensor(Object['bbox']))
-            normalized_bbox = [bbox[0]/width, bbox[1]/height, bbox[2]/width, bbox[3]/height]
-            normalized_bbox.append(Object['category_id'])
-            bboxes.append(normalized_bbox)
-
-        return bboxes
-
-
-    # ------------------------------------------------------
     # Returns list of BoundingBox instances
     def _parseAnnotations(self, anns: dict, index: int) -> list:
 
@@ -90,8 +54,7 @@ class Dataset(CocoDetection):
 
 
     # ------------------------------------------------------
-    # TODO: Clean up this function, make smaller function and call them
-    # use super().__getitem__(index) probably
+    # Used by train loader to load images and targets annots with anchors
     def __getitem__(self, index: int) -> tuple[Image.Image, tuple]:
 
         image, anns = super().__getitem__(index)
@@ -103,7 +66,8 @@ class Dataset(CocoDetection):
             image, bboxes = augmentations["image"], augmentations["bboxes"]
 
         # 6 -> objectness score, x, y, w, h, classification
-        targets = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.S]
+        # targets1 = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.S]
+        targets = TargetTensor(self.anchors, self.S)
         # Loop through all bboxes in the image and find best anchor
         for box in bboxes:
 
@@ -111,40 +75,43 @@ class Dataset(CocoDetection):
             ious = iouBetweenBboxAnchor(torch.tensor(box[2:4]), self.anchors)
             ious_indices = torch.argsort(ious, dim=0, descending=True)
             bbox = BoundingBox(list(box))
-
             # One object/Bbox corresponds to only one anchor per scale [0-2]
             bbox_has_anchor = [False, False, False] # 3 bools for 3 scales
             for iou_idx in ious_indices:
 
                 # This finds out which scale and anchor are we handling
-                scale = iou_idx // self.num_of_anchors_per_scale 
-                anchor = iou_idx % self.num_of_anchors_per_scale
-                
+                # scale = iou_idx // self.num_of_anchors_per_scale 
+                # anchor = iou_idx % self.num_of_anchors_per_scale
+                scale, _ = targets.determineAnchorAndScale(iou_idx)
                 # Computing the specific cell in grid contains the bbox midpoint
                 cx, cy = bbox.computeCells(self.S[scale])
-
                 # One anchor can handle 1 object, if two objects have midpoint 
                 # in same cell, another anchor box can detect it
-                anchor_present = targets[scale][anchor, cy, cx, 0] 
-
+                # anchor_present = targets[scale][anchor, cy, cx, 0]
+                anchor_present = targets.anchorIsPresent(cx, cy)
                 # If no anchor is assigned to this cell: [cx - cell_x, cy - cell_y] and 
                 # this specific bbox has no anchor yet, we assign it:
                 if not anchor_present and not bbox_has_anchor[scale]:
                     # Assign all the data to target tensor
-                    targets[scale][anchor, cy, cx, 0] = 1
-                    targets[scale][anchor, cy, cx, 1:5] = bbox.bb_cell_relative
-                    targets[scale][anchor, cy, cx, 5] = bbox.classification
+                    # targets1[scale][anchor, cy, cx, 0] = 1
+                    # targets1[scale][anchor, cy, cx, 1:5] = bbox.bb_cell_relative
+                    # targets1[scale][anchor, cy, cx, 5] = bbox.classification
+
+                    targets.setProbabilityToCell(cx, cy, 1)
+                    targets.setBboxToCell(cx, cy, bbox.bb_cell_relative)
+                    targets.setClassToCell(cx, cy, bbox.classification)
                     bbox_has_anchor[scale] = True
 
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
-                    targets[scale][anchor, cy, cx, 0] = -1
+                    # targets1[scale][anchor, cy, cx, 0] = -1
+                    targets.setProbabilityToCell(cx, cy, -1)
 
+        # print(torch.allclose(targets1[2], targets.tensor[2]))
         return image, tuple(targets)
 
 
-
-
 # ------------------------------------------------------
+# TODO: replace cells_to_bboxes, plot_image (thirdparty)
 def test():
 
     d = Dataset(data_path, annots_path, anchors, transform=transform)
@@ -157,14 +124,14 @@ def test():
 
     # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
     for image, targets in train_loader:
-
+        
+        print(type(targets[0]))
+        # print(targets)
         num_of_anchors = targets[0].shape[1] 
         boxes = list()
         for i in range(num_of_anchors):
 
             anchor = scaled_anchors[i]
-
-            # boxes += BoundingBox(targets[i], True, anchor).bboxes.tolist()[0]
             boxes += cells_to_bboxes(
                 targets[i], is_preds=False, S=targets[i].shape[2], anchors=anchor
             )[0]
@@ -172,8 +139,6 @@ def test():
             # boxes = nonMaxSuppression(boxes, 0.6, 0.65)
             boxes = nonMaxSuppression(boxes, 1, 0.7)
         
-        # print(torch.tensor(boxes))            
-        # print(len(boxes))            
         plot_image(image[0].permute(1, 2, 0).to('cpu'), boxes)
 
 
@@ -483,6 +448,13 @@ if __name__ == '__main__':
 
     # plot_im(image, bboxes)
 
+
+    t1 = torch.tensor([[True, True, False]], dtype=torch.int32)
+    t2 = torch.tensor([[True, True, False]], dtype=torch.int32)
+    t3 = torch.tensor([[True, True, True]], dtype=torch.int32)
+
+    print(torch.allclose(t1, t2))
+    print(torch.allclose(t1, t3))
 
 
 
