@@ -80,33 +80,24 @@ class Dataset(CocoDetection):
             for iou_idx in ious_indices:
 
                 # This finds out which scale and anchor are we handling
-                # scale = iou_idx // self.num_of_anchors_per_scale 
-                # anchor = iou_idx % self.num_of_anchors_per_scale
                 scale, _ = targets.determineAnchorAndScale(iou_idx)
                 # Computing the specific cell in grid contains the bbox midpoint
                 cx, cy = bbox.computeCells(self.S[scale])
                 # One anchor can handle 1 object, if two objects have midpoint 
                 # in same cell, another anchor box can detect it
-                # anchor_present = targets[scale][anchor, cy, cx, 0]
                 anchor_present = targets.anchorIsPresent(cx, cy)
                 # If no anchor is assigned to this cell: [cx - cell_x, cy - cell_y] and 
                 # this specific bbox has no anchor yet, we assign it:
                 if not anchor_present and not bbox_has_anchor[scale]:
                     # Assign all the data to target tensor
-                    # targets1[scale][anchor, cy, cx, 0] = 1
-                    # targets1[scale][anchor, cy, cx, 1:5] = bbox.bb_cell_relative
-                    # targets1[scale][anchor, cy, cx, 5] = bbox.classification
-
                     targets.setProbabilityToCell(cx, cy, 1)
                     targets.setBboxToCell(cx, cy, bbox.bb_cell_relative)
                     targets.setClassToCell(cx, cy, bbox.classification)
                     bbox_has_anchor[scale] = True
 
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
-                    # targets1[scale][anchor, cy, cx, 0] = -1
                     targets.setProbabilityToCell(cx, cy, -1)
 
-        # print(torch.allclose(targets1[2], targets.tensor[2]))
         return image, tuple(targets)
 
 
