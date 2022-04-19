@@ -116,7 +116,8 @@ def test():
     # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
     for image, targets in train_loader:
         
-        print(type(targets[0]))
+        print(type(targets))
+        break
         # print(targets)
         num_of_anchors = targets[0].shape[1] 
         boxes = list()

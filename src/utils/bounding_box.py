@@ -171,35 +171,6 @@ class BoundingBox:
         return self.bbox
 
 
-    # # ------------------------------------------------------
-    # # celss: [BATCH, A, S, S, 6] -> 6: [score, x, y, w, h, classification]
-    # def _fromCellsTensor(self, cells: torch.tensor, anchors):
-
-    #     S = cells.shape[2]
-    #     batch = cells.shape[0]
-    #     score = cells[..., 0:1]
-
-    #     if anchors is not None:
-    #         num_of_anchors = len(anchors)
-    #         anchors = anchors.reshape(1, num_of_anchors, 1, 1, 2)
-    #         cells[..., 0:2] = torch.sigmoid(cells[..., 0:2])
-    #         cells[..., 3:5] = torch.exp(cells[..., 3:5]) * anchors ##Checkpoint
-    #         score = torch.sigmoid(score)
-    #         best_class = torch.argmax(cells[..., 5:], dim=-1).unsqueeze(-1)
-
-    #     # cell_indices: [1, 3, 13, 13, 1]
-    #     cell_indices = torch.arange(S).repeat(batch, 3, S, 1).unsqueeze(-1).to(cells.device)
-    #     x = 1 / S * (cells[..., 1:2] + cell_indices)
-    #     y = 1 / S * (cells[..., 2:3] + cell_indices.permute(0, 1, 3, 2, 4))
-    #     wh = 1 / S * (cells[..., 3:5])
-
-    #     self.bboxes = torch.cat((best_class, score, x, y, wh), dim=-1).reshape(
-    #         batch, num_of_anchors * S * S, 6
-    #     )
-        
-    #     return self.bboxes.tolist()
-
-
 # ------------------------------------------------------
 def conversionCornersMidpointTest():
 
