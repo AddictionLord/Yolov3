@@ -18,6 +18,7 @@ architecture inspirations:
 '''
 
 config = [
+    # Darknet-53 before yolo
     (512, 1, 1),
     (1024, 3, 1),
     ["C", 1],
@@ -109,6 +110,11 @@ def testYoloOutputSize():
     assert out[1].shape == (BATCH_SIZE, 3, INPUT_WIDTH // 16, INPUT_HEIGHT // 16, num_of_classes + 5)
     assert out[2].shape == (BATCH_SIZE, 3, INPUT_WIDTH // 8, INPUT_HEIGHT // 8, num_of_classes + 5)
     print('Test was successful - Image output size is correct!')
+
+    print(f'Output shape of scale 0: {out[0].shape}')
+    print(f'Output shape of scale 1: {out[1].shape}')
+    print(f'Output shape of scale 2: {out[2].shape}')
+
 
 
 
