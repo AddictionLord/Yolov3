@@ -13,6 +13,7 @@ https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pyt
 # MSCOCO - 'coco' format is allowed only for loading (from dictionary)
 # 
 # lengths/representations: [x, y, w, h, class], [class, prob, x, y, w, h]
+# TODO: Use classmethods to construct classes from different data format
 class BoundingBox:
     def __init__(self, bbox: [torch.tensor, list, dict], form='midpoint'):
 
@@ -64,10 +65,15 @@ class BoundingBox:
 
     # ------------------------------------------------------
     # Slice bbox according to allowed representation
+    # TODO: Columns should matter, not rows? (in if elif else..)
     def _sliceBbox(self, bbox: torch.tensor):
 
-        if len(bbox.shape) > 1:
+        if len(bbox.shape) == 2:
             rows, cols = bbox.shape[0], bbox.shape[1] 
+
+        elif len(bbox.shape) == 5:
+            rows, cols = bbox.shape[3:5]
+
         else:
             rows, cols = bbox.shape[0], None 
 
