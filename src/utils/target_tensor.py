@@ -5,10 +5,8 @@ from utils import nonMaxSuppression
 
 # Each scale has one tensor, shape of tensor is:
 # shape: [num_of_anchors, cells_x, cells_y, bounding_box/anchor_data]
-# bounding_box/anchor_data format: [probability, x, y, w, h, classification]
+#        bounding_box/anchor_data format: [probability, x, y, w, h, classification]
 class TargetTensor:
-
-    # @dispatch(torch.Tensor, list)
     def __init__(self, anchors: torch.Tensor, scales_cells: list):
 
         self.anchors = anchors
@@ -40,9 +38,8 @@ class TargetTensor:
         bboxes = list()
         for scale in range(len(self.cells)):
 
-            anchor = self.anchors[scale]
             bboxes += TargetTensor.convertCellsToBoundingBoxes(
-                self.tensor[scale], fromPredictions, anchor
+                self.tensor[scale], fromPredictions, self.anchors[scale]
             )
             bboxes = nonMaxSuppression(bboxes, 1, 0.7)
 
@@ -56,10 +53,15 @@ class TargetTensor:
     def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor):
 
         batch, anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
-        scores, classes = tensor[..., 0:1], tensor[..., 5:6]
 
-        # if fromPredictions:
+        if fromPredictions:
+            tensor, _ = TorchTensor.convertPredsToBoundingBox(tensor, anchor)
+            classes = torch.argmax(torch[..., 5:], dim=-1).unsqueeze(-1)
         
+        else:
+            classes = tensor[..., 5:6]
+        
+        scores = tensor[..., 0:1]
         cell_indices = torch.arange(cells).repeat(batch, 3, cells, 1).unsqueeze(-1).to(tensor.device)
         x = (cell_indices + tensor[..., 1:2]) * (1 / cells)
         y = (cell_indices.permute(0, 1, 3, 2, 4) + tensor[..., 2:3]) * (1 / cells)
@@ -67,6 +69,17 @@ class TargetTensor:
 
         return torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
             batch, anchors * cells * cells, 6).tolist()[0]
+
+
+    # ------------------------------------------------------
+    @staticmethod
+    def convertPredsToBoundingBox(tensor, anchors):
+
+        anchors = anchors.reshape(1, len(anchors), 1, 1, 2)
+        tensor[..., 0:3] = torch.sigmoid(tensor[..., 0:3])
+        tensor[..., 3:5] = torch.exp(tensor[..., 3:5]) * anchors
+
+        return tensor, anchors
 
 
     # ------------------------------------------------------
