@@ -19,6 +19,7 @@ class Loss(nn.Module):
         self.entropy = nn.CrossEntropyLoss()
         self.sigmoid = nn.Sigmoid()
 
+        # Values from Yolov1 paper
         # self.lambda_coord = 5 #10
         # self.lambda_noobj = 0.5 #10
 
@@ -42,26 +43,16 @@ class Loss(nn.Module):
         noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
         noobj_loss[torch.isnan(noobj_loss)] = 0
 
-        print(f'No object loss: {noobj_loss}')
-
-
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.detach().clone(), anchors)
         ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]).detach()
         obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
 
-        print(f'Object loss: {obj_loss}')
-
         # box coordinates loss
         xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
-        # predictions[..., 1:3] = self.sigmoid(predictions[..., 1:3]) 
         target[..., 3:5] = torch.log(1e-16 + target[..., 3:5] / anchors)
         wh_loss = self.mse(predictions[..., 3:5][Iobj], target[..., 3:5][Iobj])
         box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
-        # box_loss = self.mse(predictions[..., 1:5][Iobj], target[..., 1:5][Iobj])
-
-
-        print(f'Box loss: {box_loss}')
 
         # class loss
         class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5:6][Iobj].long().squeeze())
@@ -81,33 +72,15 @@ class Loss(nn.Module):
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    # bce = nn.BCEWithLogitsLoss()
 
-    # t = torch.tensor([1., 0., 1., 0., 0., 0.]).reshape(6, 1).repeat(1, 6)
-    # o = torch.tensor([1., 0., 1., 1., 0., 0.]).reshape(6, 1).repeat(1, 6)
+    predictions = torch.rand(1, 3, 13, 13, 11)
+    target = torch.rand(1, 3, 13, 13, 6)
+    target[..., 0:1] = 1
+    anchors = torch.rand(3, 2)
 
-    # print(o[..., 0:1][True])
-
-    # loss = bce((o[..., 0:1][True]), (t[..., 0:1][True]))
-    # print(loss)
-
-    with torch.no_grad():
-
-        for _ in range(10):
-
-            predictions = torch.rand(1, 3, 13, 13, 11)
-            target = torch.rand(1, 3, 13, 13, 6)
-            target[..., 0:1] = 1
-            anchors = torch.rand(3, 2)
-
-            l = Loss()
-            loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
-            print(f"Loss: {loss.shape}")
-
-            # print(yoloss == loss)
-            print(torch.allclose(yoloss, loss))
-
-            break
+    l = Loss()
+    loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
+    print(f"Loss: {loss}")
 
     # -------------------------------------------
     # mse = nn.MSELoss()
@@ -132,19 +105,3 @@ if __name__ == "__main__":
     #     cnt += torch.allclose(mymse, tmse)
 
     # print(cnt)
-
-
-
-    # mse = nn.MSELoss() 
-
-    # a = torch.rand(10, 10, dtype=torch.float64)
-    # b = torch.rand(10, 10, dtype=torch.float64)
-
-    # def m(a, b):
-
-    #     c = b - a
-
-    #     return torch.mean(c**2)
-
-    # print(mse(a, b))
-    # print(m(a, b))
