@@ -9,6 +9,18 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 '''
 
 IMAGE_SIZE = 416
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+NUM_WORKERS = 4
+BATCH_SIZE = 1
+CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
+NUM_OF_CLASSES = 6
+PIN_MEMORY = True
+
+val_imgs_path = r'dataset/val2017'
+val_annots_path = r'dataset/instances_val2017.json'
+train_imgs_path = r'dataset/train2017'
+train_annots_path = r'dataset/instances_train2017.json'
+
 
 # Each list inside of ANCHORS correspond to specific prediction scale (3 scales)
 ANCHORS = [
@@ -17,6 +29,39 @@ ANCHORS = [
     [(0.02, 0.03), (0.04, 0.07), (0.08, 0.06)],
 ]  # Note these have been rescaled to be between [0, 1]
 
+
+
+scale = 1.2
+train_transforms = A.Compose(
+    [
+        A.LongestMaxSize(max_size=int(IMAGE_SIZE * scale)),
+        A.PadIfNeeded(
+            min_height=int(IMAGE_SIZE * scale),
+            min_width=int(IMAGE_SIZE * scale),
+            border_mode=cv2.BORDER_CONSTANT,
+        ),
+        A.RandomCrop(width=IMAGE_SIZE, height=IMAGE_SIZE),
+        A.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.6, p=0.4),
+        A.OneOf(
+            [
+                A.ShiftScaleRotate(
+                    rotate_limit=20, p=0.5, border_mode=cv2.BORDER_CONSTANT
+                ),
+                A.IAAAffine(shear=15, p=0.5, mode="constant"),
+            ],
+            p=1.0,
+        ),
+        A.HorizontalFlip(p=0.5),
+        A.Blur(p=0.1),
+        A.CLAHE(p=0.1),
+        A.Posterize(p=0.1),
+        A.ToGray(p=0.1),
+        A.ChannelShuffle(p=0.05),
+        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1], max_pixel_value=255,),
+        ToTensorV2(),
+    ],
+    bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[],),
+)
 
 test_transforms = A.Compose(
     [
@@ -29,13 +74,6 @@ test_transforms = A.Compose(
     ],
     bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[]),
 )
-
-
-val_imgs_path = 'dataset/val2017'
-val_annots_path = 'dataset/instances_val2017.json'
-train_imgs_path = 'dataset/train2017'
-train_annots_path = 'dataset/instances_train2017.json'
-
 
 LABELS = [
  'person',

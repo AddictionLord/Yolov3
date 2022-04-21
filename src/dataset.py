@@ -19,7 +19,7 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 class Dataset(CocoDetection):
     def __init__(self, 
-        root: str, annFile: str, anchors: list, img_size=416, S=[13, 26, 52], C=6,transform=None
+        root: str, annFile: str, anchors: list, S=[13, 26, 52], C=6,transform=None
     ):
         super(Dataset, self).__init__(root, annFile)
 
@@ -27,7 +27,6 @@ class Dataset(CocoDetection):
         self.annFile = annFile
 
         self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64)
-        self.img_size = img_size
         self.S = S
         self.C = C
         self.transform = transform
