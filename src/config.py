@@ -8,6 +8,9 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 '''
 
+
+
+# ------------------------------------------------------
 IMAGE_SIZE = 416
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 4
@@ -15,13 +18,26 @@ BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
+NUM_OF_EPOCHS = 100
+LEARNING_RATE = 1e-5
+WEIGHT_DECAY = 1e-4
 
+SCALED_ANCHORS =  (
+    torch.tensor(config.ANCHORS) * 
+    torch.tensor(config.CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2)
+)
+
+
+# ------------------------------------------------------
+# Path to datasets
 val_imgs_path = r'dataset/val2017'
 val_annots_path = r'dataset/instances_val2017.json'
 train_imgs_path = r'dataset/train2017'
 train_annots_path = r'dataset/instances_train2017.json'
 
 
+# ------------------------------------------------------
+# Anchors computed bz K-means for MSCoco dataset
 # Each list inside of ANCHORS correspond to specific prediction scale (3 scales)
 ANCHORS = [
     [(0.28, 0.22), (0.38, 0.48), (0.9, 0.78)],
@@ -30,7 +46,8 @@ ANCHORS = [
 ]  # Note these have been rescaled to be between [0, 1]
 
 
-
+# ------------------------------------------------------
+# Transformation for train and test datasets
 scale = 1.2
 train_transforms = A.Compose(
     [
@@ -47,7 +64,8 @@ train_transforms = A.Compose(
                 A.ShiftScaleRotate(
                     rotate_limit=20, p=0.5, border_mode=cv2.BORDER_CONSTANT
                 ),
-                A.IAAAffine(shear=15, p=0.5, mode="constant"),
+                # A.IAAAffine(shear=15, p=0.5, mode="constant"),
+                A.Affine(shear=15, p=0.5, mode="constant"),
             ],
             p=1.0,
         ),
@@ -75,6 +93,35 @@ test_transforms = A.Compose(
     bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[]),
 )
 
+
+# ------------------------------------------------------
+# Original (Redmons) yolo config (without darknet53)
+yolo_config = [
+    # Darknet-53 before yolo
+    (512, 1, 1),
+    (1024, 3, 1),
+    ["C", 1],
+    (512, 1, 1),
+    "S",
+    (256, 1, 1),
+    {"U": 2},
+    (256, 1, 1),
+    (512, 3, 1),
+    ["C", 1],
+    (256, 1, 1),
+    "S",
+    (128, 1, 1),
+    {"U": 2},
+    (128, 1, 1),
+    (256, 3, 1),
+    ["C", 1],
+    (128, 1, 1),
+    "S"
+]
+
+
+# ------------------------------------------------------
+# MSCoco dataset labels
 LABELS = [
  'person',
  'bicycle',
@@ -157,3 +204,5 @@ LABELS = [
  'hair drier',
  'toothbrush'
 ]
+
+
