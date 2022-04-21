@@ -7,7 +7,7 @@ from dataset import Dataset
 from loss import Loss
 import config
 
-from utils import getLoaders
+from utils import getLoaders, TargetTensor
 
 
 
@@ -43,10 +43,19 @@ class YoloTrainer:
 
     
     # ------------------------------------------------------
-    def _train(model, optimizer):
+    def _train(self, model: Yolov3, optimizer: torch.optim):
 
-        pass
+        loader = tqdm(self.train_loader)
+        for batch, (img, targets) in enumerate(loader):
 
+            img = img.to(config.DEVICE)
+            # tar_s1, tar_s2, tar_s3 = TargetTensor.passTargetsToDevice(targets, config.DEVICE)
+            targets = TargetTensor.fromDataLoader(self.scaled_anchors, targets)
+            with torch.cuda.amp.autocast():
+                output = model(img)
+                loss = targets.computeLossWith(output, self.loss)
+                print(loss)
+                input()
 
 
 
@@ -59,12 +68,15 @@ if __name__ == '__main__':
     t = YoloTrainer()
     t.trainYoloNet(config.yolo_config)
 
-    # ------------------------------------------------------
-    # Scaling anchors
-    a = torch.tensor(config.ANCHORS) # shape: [3, 3, 2]
-    S = config.CELLS_PER_SCALE # list len = 3 - need same shape, each matrix a[i, ...] to one scale
-    S = torch.tensor(S).view(-1, 1, 1).repeat(1, 3, 2)
-    scaled_anchors = a * S
+    # # ------------------------------------------------------
+    # # Scaling anchors
+    # a = torch.tensor(config.ANCHORS) # shape: [3, 3, 2]
+    # S = config.CELLS_PER_SCALE # list len = 3 - need same shape, each matrix a[i, ...] to one scale
+    # S = torch.tensor(S).view(-1, 1, 1).repeat(1, 3, 2)
+    # scaled_anchors = a * S
+
+    # scaled_anchors = torch.tensor(config.ANCHORS) * torch.tensor(config.CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2)
+    # print(scaled_anchors[0])
 
     scaled_anchors = torch.tensor(config.ANCHORS) * torch.tensor(config.CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2)
 
