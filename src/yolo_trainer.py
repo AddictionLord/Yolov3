@@ -24,15 +24,16 @@ class YoloTrainer:
 
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model
-    def trainYoloNet(self, config: list):
+    def trainYoloNet(self, yolo_config: list):
 
-        model = Yolov3(config)
+        model = Yolov3(yolo_config)
         optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
         for epoch in range(config.NUM_OF_EPOCHS):
 
             self._train(model, optimizer)
             if epoch != 0 and epoch % 4 == 0:
                 model.eval()
+                # TODO: Implement evaluating fcns
                 # checkClassAccuracy()
                 # preds_bboxes, target_bboxes = getBboxesToEvaluate()
                 # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
@@ -55,8 +56,8 @@ if __name__ == '__main__':
     import config
     import torch
 
-    # t = YoloTrainer()
-    # t.trainYoloNet(config.yolo_config)
+    t = YoloTrainer()
+    t.trainYoloNet(config.yolo_config)
 
     # ------------------------------------------------------
     # Scaling anchors
