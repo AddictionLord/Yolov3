@@ -104,10 +104,7 @@ def test(data_path, annots_path):
     d = Dataset(data_path, annots_path, anchors, transform=transform)
     train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
-    S = [13, 26, 52]
-    scaled_anchors = torch.tensor(anchors) / (
-        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
-    )
+    scaled_anchors = config.SCALED_ANCHORS
 
     # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
     for image, targets in train_loader:
