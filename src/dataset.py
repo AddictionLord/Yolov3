@@ -178,7 +178,6 @@ if __name__ == '__main__':
     val_img = config.val_imgs_path
     val_annots = config.val_annots_path
 
-    # atest()
     test(val_img, val_annots)
 
     # d = Dataset(data_path, annots_path, anchors, transform=None)
@@ -218,9 +217,3 @@ if __name__ == '__main__':
     print(torch.allclose(t1, t3))
 
 
-
-
-
-
-
-# %%
