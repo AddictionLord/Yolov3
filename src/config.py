@@ -31,6 +31,12 @@ test_transforms = A.Compose(
 )
 
 
+val_imgs_path = 'dataset/val2017'
+val_annots_path = 'dataset/instances_val2017.json'
+train_imgs_path = 'dataset/train2017'
+train_annots_path = 'dataset/instances_train2017.json'
+
+
 LABELS = [
  'person',
  'bicycle',

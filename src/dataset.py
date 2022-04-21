@@ -100,7 +100,7 @@ class Dataset(CocoDetection):
 
 # ------------------------------------------------------
 # TODO: replace cells_to_bboxes, plot_image (thirdparty)
-def test():
+def test(data_path, annots_path):
 
     d = Dataset(data_path, annots_path, anchors, transform=transform)
     train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
@@ -173,19 +173,14 @@ def plot_image(image, boxes):
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-
-    # data_path = 'dataset/train2017'
-    # annots_path = 'dataset/instances_train2017.json'
-    data_path = 'dataset/val2017'
-    annots_path = 'dataset/instances_val2017.json'
-
     anchors = config.ANCHORS
     transform = config.test_transforms
 
-
+    val_img = config.val_imgs_path
+    val_annots = config.val_annots_path
 
     # atest()
-    test()
+    test(val_img, val_annots)
 
     # d = Dataset(data_path, annots_path, anchors, transform=None)
     # train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=True)
