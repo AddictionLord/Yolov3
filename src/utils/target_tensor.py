@@ -30,7 +30,7 @@ class TargetTensor:
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
-            loss += loss_fcn(target, pred, self.anchors[scale, ...])
+            loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
         return loss
 
