@@ -74,7 +74,7 @@ class CNNBuilder:
     def _constructNeuralNetwork(self, config: list, in_channels: int):
 
         net = nn.ModuleList()
-        for block in self.config:
+        for block in config:
 
             # Construction of CNNBlock
             # CNNBlock changes number of channels, thus update

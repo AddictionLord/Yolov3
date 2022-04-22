@@ -1,4 +1,8 @@
 import torch
+import sys
+
+sys.path.insert(1, '/home/mary/thesis/project/src/')
+import config
 
 
 '''
@@ -145,7 +149,7 @@ class BoundingBox:
     def _parseAnnotations(self, anns: dict):
 
         bbox = anns['bbox']
-        bbox.append(anns['category_id'])
+        bbox.append(config.LABELS_INDICES.index(anns['category_id'] - 1))
 
         return torch.tensor(bbox)
 

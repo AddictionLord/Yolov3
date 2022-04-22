@@ -19,7 +19,7 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 class Dataset(CocoDetection):
     def __init__(self, 
-        root: str, annFile: str, anchors: list, img_size=416, S=[13, 26, 52], C=6,transform=None
+        root: str, annFile: str, anchors: list, S=[13, 26, 52], C=6,transform=None
     ):
         super(Dataset, self).__init__(root, annFile)
 
@@ -27,7 +27,6 @@ class Dataset(CocoDetection):
         self.annFile = annFile
 
         self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64)
-        self.img_size = img_size
         self.S = S
         self.C = C
         self.transform = transform
@@ -100,15 +99,12 @@ class Dataset(CocoDetection):
 
 # ------------------------------------------------------
 # TODO: replace cells_to_bboxes, plot_image (thirdparty)
-def test():
+def test(data_path, annots_path):
 
     d = Dataset(data_path, annots_path, anchors, transform=transform)
     train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
-    S = [13, 26, 52]
-    scaled_anchors = torch.tensor(anchors) / (
-        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
-    )
+    scaled_anchors = config.SCALED_ANCHORS
 
     # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
     for image, targets in train_loader:
@@ -173,19 +169,13 @@ def plot_image(image, boxes):
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-
-    # data_path = 'dataset/train2017'
-    # annots_path = 'dataset/instances_train2017.json'
-    data_path = 'dataset/val2017'
-    annots_path = 'dataset/instances_val2017.json'
-
     anchors = config.ANCHORS
     transform = config.test_transforms
 
+    val_img = config.val_imgs_path
+    val_annots = config.val_annots_path
 
-
-    # atest()
-    test()
+    test(val_img, val_annots)
 
     # d = Dataset(data_path, annots_path, anchors, transform=None)
     # train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=True)
@@ -224,9 +214,3 @@ if __name__ == '__main__':
     print(torch.allclose(t1, t3))
 
 
-
-
-
-
-
-# %%
