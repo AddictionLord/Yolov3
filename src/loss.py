@@ -57,6 +57,9 @@ class Loss(nn.Module):
         # print(f'Box loss: {box_loss}')
 
         # class loss
+        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long() - 1)# .squeeze())
+        # print(f'Class loss: {class_loss}')
+
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         noobj_loss[torch.isnan(noobj_loss)]     = 0
         obj_loss[torch.isnan(obj_loss)]         = 0
