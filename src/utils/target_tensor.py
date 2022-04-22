@@ -1,5 +1,7 @@
 import torch
+import sys
 
+sys.path.insert(1, '/home/mary/thesis/project/src/')
 import config
 from utils import nonMaxSuppression
 
@@ -30,6 +32,7 @@ class TargetTensor:
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
+            # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
             loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
         return loss
