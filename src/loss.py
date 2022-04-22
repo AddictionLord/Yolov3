@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+import config
 from utils import intersectionOverUnion, TargetTensor
 
 
@@ -20,11 +21,8 @@ class Loss(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         # Values from Yolov1 paper
-        # self.lambda_coord = 5 #10
-        # self.lambda_noobj = 0.5 #10
-
-        self.lambda_coord = 10
-        self.lambda_noobj = 10
+        self.lambda_coord = config.LAMBDA_COORD #10
+        self.lambda_noobj = config.LAMBDA_NOOBJ #0.5 #10
 
 
     # ------------------------------------------------------
@@ -57,8 +55,7 @@ class Loss(nn.Module):
         # print(f'Box loss: {box_loss}')
 
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long() - 1)# .squeeze())
-        # print(f'Class loss: {class_loss}')
+        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
 
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         noobj_loss[torch.isnan(noobj_loss)]     = 0
