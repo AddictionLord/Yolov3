@@ -1,5 +1,8 @@
 import torch
+import sys
 
+sys.path.insert(1, '/home/mary/thesis/project/src/')
+import config
 from utils import nonMaxSuppression
 
 
@@ -19,7 +22,35 @@ class TargetTensor:
 
 
     # ------------------------------------------------------
-    # Used to create instance from different data than original constructor
+    # Computes loss with another list of tensors with given loss fcn
+    def computeLossWith(self, preds: list, loss_fcn):
+
+        targets, d = self.tensor, torch.device(config.DEVICE)
+        TargetTensor.passTargetsToDevice(preds, d) if preds[0].device != d else None
+        TargetTensor.passTargetsToDevice(targets, d) if targets[0].device != d else None
+
+        loss = 0
+        for scale, (target, pred) in enumerate(zip(targets, preds)):
+
+            # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
+            loss += loss_fcn(pred, target, self.anchors[scale, ...])
+
+        return loss
+
+
+    # ------------------------------------------------------
+    # Sets all tensors in target to specific device
+    @staticmethod
+    def passTargetsToDevice(targets: list, device: str):
+
+        for tensor in targets:
+
+            tensor.to(device)
+
+
+    # ------------------------------------------------------
+    # Used to create instance from different data than original constructor,
+    # scaled_anchors sould be confing.SCALED_ANCHORS
     @classmethod
     def fromDataLoader(cls, scaled_anchors: list, targets: list):
 
@@ -72,10 +103,11 @@ class TargetTensor:
 
 
     # ------------------------------------------------------
+    # anchors.shape [3, 2] rquired, this is for only one scale
     @staticmethod
-    def convertPredsToBoundingBox(tensor, anchors):
+    def convertPredsToBoundingBox(tensor: torch.tensor, anchors: torch.tensor):
 
-        anchors = anchors.reshape(1, len(anchors), 1, 1, 2)
+        anchors = anchors.reshape(1, len(anchors), 1, 1, 2) 
         tensor[..., 0:3] = torch.sigmoid(tensor[..., 0:3])
         tensor[..., 3:5] = torch.exp(tensor[..., 3:5]) * anchors
 
@@ -129,24 +161,12 @@ class TargetTensor:
     
     # ------------------------------------------------------
     # Takes cell position index (x, y) and sets which class does it belong to
-    def setClassToCell(self, cell_x: int, cell_y: int, classification: float):
+    def setClassToCell(self, cell_x: int, cell_y: int, classification: int):
 
-        self.tensor[self.scale][self.anchor, cell_y, cell_x, 5] = classification
+        self.tensor[self.scale][self.anchor, cell_y, cell_x, 5] = int(classification)
 
         
     
-
-
-
-
-    
-
-
-
-
-
-
-
 
 if __name__ == '_main_':
 
