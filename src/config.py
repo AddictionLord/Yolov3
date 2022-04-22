@@ -14,23 +14,28 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 IMAGE_SIZE = 416
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 4
-BATCH_SIZE = 1
+BATCH_SIZE = 4
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
 NUM_OF_EPOCHS = 100
 LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
+LAMBDA_COORD = 5 #10
+LAMBDA_NOOBJ = 0.5 #10
+
 
 
 
 
 # ------------------------------------------------------
-# Path to datasets
+# Paths
 val_imgs_path = r'dataset/val2017'
 val_annots_path = r'dataset/instances_val2017.json'
 train_imgs_path = r'dataset/train2017'
 train_annots_path = r'dataset/instances_train2017.json'
+
+darknet53_path = 'models/pretrained/darknet53.conv.74'
 
 
 # ------------------------------------------------------
@@ -120,10 +125,33 @@ yolo_config = [
     "S"
 ]
 
+darknet_config = [
+    (32, 3, 1),
+    (64, 3, 2),
+    ["R", 1],
+    (128, 3, 2),
+    ["R", 2],
+    (256, 3, 2),
+    ["R", 8],
+    (512, 3, 2),
+    ["R", 8],
+    (1024, 3, 2),
+    ["R", 4]
+]
 
 # ------------------------------------------------------
-# MSCoco dataset labels
+# Modified MSCoco dataset labels
 LABELS = [
+ 'person',
+ 'bicycle',
+ 'car',
+ 'motorcycle',
+ 'dog',
+ 'bus'
+]
+
+# MSCoco dataset labels
+COCO_LABELS = [
  'person',
  'bicycle',
  'car',
@@ -205,5 +233,31 @@ LABELS = [
  'hair drier',
  'toothbrush'
 ]
+
+# Connects COCO_LABLES with LABELS to train custom dataset 
+LABELS_INDICES = [COCO_LABELS.index(label) for label in LABELS]
+
+
+
+
+if __name__ == '__main__':
+
+    t = torch.tensor([0, 1, 2, 3, 5, 17, 17, 17])
+    print(t)
+    seventeen = torch.where(t == 17)
+    t[seventeen] = 4
+    print(t)
+
+
+    indices = list()
+    for label in LABELS:
+
+        indices.append(COCO_LABELS.index(label))
+
+    indices = [COCO_LABELS.index(label) for label in LABELS] 
+    print(indices)
+
+    print(LABELS_INDICES.index(17))
+
 
 
