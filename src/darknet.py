@@ -2,9 +2,11 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from blocks.residual_block import ResidualBlock
-from blocks.cnn_builder import CNNBuilder
-from utils.weights_handler import WeightsHandler
+import config
+
+from blocks import ResidualBlock
+from blocks import CNNBuilder
+from utils import WeightsHandler
 
 
 '''
@@ -18,34 +20,21 @@ architecture inspirations:
 
 '''
 
-darknet53_path = 'pretrained/darknet53.conv.74'
 
-# TODO: Load darknet53 config from json/config file
-config = [
-    (32, 3, 1),
-    (64, 3, 2),
-    ["R", 1],
-    (128, 3, 2),
-    ["R", 2],
-    (256, 3, 2),
-    ["R", 8],
-    (512, 3, 2),
-    ["R", 8],
-    (1024, 3, 2),
-    ["R", 4]
-]
 
 
 class Darknet(nn.Module, CNNBuilder):
-    def __init__(self, in_channels: int, pretrained=True, config=config):
+    def __init__(self, in_channels: int, pretrained=True):
         super(Darknet, self).__init__()
 
         self.in_channels = in_channels
-        self.config = config
+        self.config = config.darknet_config
+        self.weights_path = config.darknet53_path
         self.weights_handler = None
         self.concatenation = list()
-        self.darknet = self._constructNeuralNetwork(config, in_channels)
-        self.loadPretrainedModel(darknet53_path) if pretrained else None
+
+        self.darknet = self._constructNeuralNetwork(self.config, in_channels)
+        self.loadPretrainedModel(self.weights_path) if pretrained else None
 
 
     # ------------------------------------------------------
