@@ -41,21 +41,27 @@ class Loss(nn.Module):
 
         # loss when there is no object
         noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-        noobj_loss[torch.isnan(noobj_loss)] = 0
+        # print(f'No object loss: {noobj_loss}')
 
         # loss when there is object
-        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.detach().clone(), anchors)
+        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.detach().clone(), anchors.detach().clone())
         ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]).detach()
         obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        # print(f'Object loss: {obj_loss}')
 
         # box coordinates loss
         xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         target[..., 3:5] = torch.log(1e-16 + target[..., 3:5] / anchors)
         wh_loss = self.mse(predictions[..., 3:5][Iobj], target[..., 3:5][Iobj])
         box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+        # print(f'Box loss: {box_loss}')
 
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5:6][Iobj].long().squeeze())
+        # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
+        noobj_loss[torch.isnan(noobj_loss)]     = 0
+        obj_loss[torch.isnan(obj_loss)]         = 0
+        box_loss[torch.isnan(box_loss)]         = 0
+        class_loss[torch.isnan(class_loss)]     = 0
 
         # loss fcn
         loss = (self.lambda_coord * box_loss
