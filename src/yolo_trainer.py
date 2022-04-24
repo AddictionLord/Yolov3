@@ -103,7 +103,19 @@ if __name__ == '__main__':
     import torch
 
     t = YoloTrainer()
-    t.trainYoloNet(config.yolo_config)
+
+    try:
+        t.trainYoloNet(config.yolo_config)
+
+    except KeyboardInterrupt as e:
+        print('[YOLO TRAINER]: KeyboardInterrupt\n', e)
+
+    except Exception as e:
+        print(e)
+
+    finally:
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/test_model2.pth.tar")
+
 
     # # ------------------------------------------------------
     # # Scaling anchors
