@@ -36,16 +36,19 @@ class YoloTrainer:
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
+        self.model = None
+        self.optimizer = None
+
     
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model
     def trainYoloNet(self, yolo_config: list):
 
-        model = Yolov3(yolo_config)
-        optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        self.model = Yolov3(yolo_config)
+        self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
         for epoch in range(config.NUM_OF_EPOCHS):
 
-            self._train(model, optimizer)
+            self._train(self.model, self.optimizer)
             if epoch != 0 and epoch % 4 == 0:
                 model.eval()
                 # TODO: Implement evaluating fcns
@@ -54,7 +57,7 @@ class YoloTrainer:
                 # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
                 model.train()
 
-        return model
+        return self.model, self.optimizer
 
 
     # ------------------------------------------------------
@@ -81,6 +84,17 @@ class YoloTrainer:
             loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
 
 
+    # ------------------------------------------------------
+    @staticmethod
+    def saveModel(model, optimizer, filename="./models/test_model.pth.tar"):
+
+        print("[YOLO TRAINER]: Model saved")
+        container = {
+            "state_dict": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+        }
+
+        torch.save(container, filename)
 
 
 if __name__ == '__main__':
