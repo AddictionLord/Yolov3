@@ -24,6 +24,9 @@ Adam optimizer:
 Progress bar tqdm docs:
     https://pypi.org/project/tqdm/
 
+Saving and loading models:
+    https://www.youtube.com/watch?v=9L9jEOwRrCg
+
 '''
 
 
@@ -36,16 +39,22 @@ class YoloTrainer:
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
+        self.model = None
+        self.optimizer = None
+
     
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model
-    def trainYoloNet(self, yolo_config: list):
+    def trainYoloNet(self, net: dict, load: bool=False):
 
-        model = Yolov3(yolo_config)
-        optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        self.model = Yolov3(net['architecture'])
+        self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        if load:
+            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
+
         for epoch in range(config.NUM_OF_EPOCHS):
 
-            self._train(model, optimizer)
+            self._train(self.model, self.optimizer)
             if epoch != 0 and epoch % 4 == 0:
                 model.eval()
                 # TODO: Implement evaluating fcns
@@ -54,7 +63,7 @@ class YoloTrainer:
                 # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
                 model.train()
 
-        return model
+        return self.model, self.optimizer
 
 
     # ------------------------------------------------------
@@ -81,6 +90,38 @@ class YoloTrainer:
             loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
 
 
+    # ------------------------------------------------------
+    @staticmethod
+    def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
+
+        print("[YOLO TRAINER]: Model saved")
+        container = {
+            "state_dict": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "architecture": model.config,
+        }
+
+        torch.save(container, path)
+
+
+    # ------------------------------------------------------
+    @staticmethod
+    def loadModel(path: str="./models/test_model.pth.tar"):
+
+        print("[YOLO TRAINER]: Loading model container..")
+
+        return torch.load(path, map_location=config.DEVICE)
+
+
+    # ------------------------------------------------------
+    @staticmethod
+    def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
+
+        print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
+        model.load_state_dict(params['state_dict'])
+        optimizer.load_state_dict(params['optimizer'])
+
+
 
 
 if __name__ == '__main__':
@@ -89,17 +130,45 @@ if __name__ == '__main__':
     import torch
 
     t = YoloTrainer()
-    t.trainYoloNet(config.yolo_config)
+    container = {'architecture': config.yolo_config}
 
-    # # ------------------------------------------------------
-    # # Scaling anchors
-    # a = torch.tensor(config.ANCHORS) # shape: [3, 3, 2]
-    # S = config.CELLS_PER_SCALE # list len = 3 - need same shape, each matrix a[i, ...] to one scale
-    # S = torch.tensor(S).view(-1, 1, 1).repeat(1, 3, 2)
-    # scaled_anchors = a * S
+    try:
+        t.trainYoloNet(container)
 
-    # scaled_anchors = torch.tensor(config.ANCHORS) * torch.tensor(config.CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2)
-    # print(scaled_anchors[0])
+    except KeyboardInterrupt as e:
+        print('[YOLO TRAINER]: KeyboardInterrupt', e)
+
+    except Exception as e:
+        print(e)
+
+    finally:
+        saved = t.model.parameters()
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/test_model.pth.tar")
+
+
+    params = YoloTrainer.loadModel("./models/test_model.pth.tar")
+
+    model = Yolov3(params['architecture'])
+    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+
+    YoloTrainer.uploadParamsToModel(model, optimizer, params)
+    loaded = model.parameters()
+
+    for parama, paramb in zip(saved, loaded):
+
+        a = parama
+        b = paramb
+
+        if torch.rand(1).item() > 0.7:
+            break
+
+    print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
+        
+
+    
+
+
+
 
 
 
