@@ -52,7 +52,7 @@ class TargetTensor:
     # Used to create instance from different data than original constructor,
     # scaled_anchors sould be confing.SCALED_ANCHORS
     @classmethod
-    def fromDataLoader(cls, scaled_anchors: list, targets: list):
+    def fromDataLoader(cls, scaled_anchors: torch.tensor, targets: list):
 
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
         tt = cls(scaled_anchors.reshape(-1, 2), scales_cells)
@@ -62,17 +62,31 @@ class TargetTensor:
 
 
     # ------------------------------------------------------
-    # Difference between computing BBs from predictions and from dataloader
-    def computeBoundingBoxes(self, fromPredictions=True):
+    # Compute BBs from models predictions (iterating over all the scales)
+    def computeBoundingBoxesFromPreds(self):
 
         num_of_anchors = self.num_of_anchors_per_scale
         bboxes = list()
         for scale in range(len(self.cells)):
 
             bboxes += TargetTensor.convertCellsToBoundingBoxes(
-                self.tensor[scale], fromPredictions, self.anchors[scale]
-            )
-            bboxes = nonMaxSuppression(bboxes, 1, 0.7)
+                self.tensor[scale], True, self.anchors[scale]
+            )[0]
+
+            bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
+
+        return bboxes
+
+
+    # ------------------------------------------------------
+    # Get BB from dataloader (no need to iterate over all scales)
+    def getBoundingBoxesFromDataloader(self):
+
+        num_of_anchors = self.num_of_anchors_per_scale
+        bboxes = TargetTensor.convertCellsToBoundingBoxes(
+            self.tensor[0], False, self.anchors[0]
+        )[0]
+        bboxes = nonMaxSuppression(bboxes, 1, 0.99)
 
         return bboxes
 
@@ -83,11 +97,11 @@ class TargetTensor:
     @staticmethod
     def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor):
 
-        batch, anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
+        batch, num_anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
 
         if fromPredictions:
-            tensor, _ = TorchTensor.convertPredsToBoundingBox(tensor, anchor)
-            classes = torch.argmax(torch[..., 5:], dim=-1).unsqueeze(-1)
+            tensor, _ = TargetTensor.convertPredsToBoundingBox(tensor, anchor)
+            classes = torch.argmax(tensor[..., 5:], dim=-1).unsqueeze(-1)
         
         else:
             classes = tensor[..., 5:6]
@@ -99,7 +113,7 @@ class TargetTensor:
         wh = tensor[..., 3:5] / cells
 
         return torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
-            batch, anchors * cells * cells, 6).tolist()[0]
+            batch, num_anchors * cells * cells, 6).tolist()
 
 
     # ------------------------------------------------------
@@ -165,8 +179,8 @@ class TargetTensor:
 
         self.tensor[self.scale][self.anchor, cell_y, cell_x, 5] = int(classification)
 
-        
-    
+
+
 
 if __name__ == '_main_':
 
