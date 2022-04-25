@@ -110,7 +110,7 @@ def test(data_path, annots_path):
     for image, targets in train_loader:
 
         target = TargetTensor.fromDataLoader(scaled_anchors, targets)
-        bboxes = target.computeBoundingBoxes(fromPredictions=False)
+        bboxes = target.getBoundingBoxesFromDataloader()
 
         plot_image(image[0].permute(1, 2, 0).to('cpu'), bboxes)
 
@@ -140,7 +140,7 @@ def plot_image(image, boxes):
     # Create a Rectangle patch
     for box in boxes:
         assert len(box) == 6, "box should contain class pred, confidence, x, y, width, height"
-        class_pred = box[0] - 1
+        class_pred = box[0]
         box = box[2:]
         upper_left_x = box[0] - box[2] / 2
         upper_left_y = box[1] - box[3] / 2
