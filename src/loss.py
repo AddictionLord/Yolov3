@@ -38,7 +38,7 @@ class Loss(nn.Module):
         Inoobj = target[..., 0] == 0
 
         # loss when there is no object
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        noobj_loss = self.mse(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
         # print(f'No object loss: {noobj_loss}')
 
         # loss when there is object
@@ -56,6 +56,7 @@ class Loss(nn.Module):
 
         # class loss
         class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        # print(f'Class loss: {class_loss}')
 
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         noobj_loss[torch.isnan(noobj_loss)]     = 0
@@ -64,14 +65,42 @@ class Loss(nn.Module):
         class_loss[torch.isnan(class_loss)]     = 0
 
         # loss fcn
-        loss = (self.lambda_coord * box_loss
+        return (self.lambda_coord * box_loss
             + obj_loss 
             + self.lambda_noobj * noobj_loss
             + class_loss
         )
 
-        return loss
 
+
+
+# ------------------------------------------------------
+def getOptimalTargetAndPreds():
+
+    # anchors = torch.rand(3, 2)
+    anchors = torch.tensor([[1, 1], [2, 2], [3, 3]])
+    anchors_reshaped = anchors.reshape(1, len(anchors), 1, 1, 2) 
+    predictions = torch.zeros(1, 3, 3, 3, 11)
+    target = predictions[..., 0:6].detach().clone() #torch.rand(1, 3, 13, 13, 6)
+
+    # this is for score
+    predictions[0, 0, 1, 1, 0] = 7 # 7 because sigmoid(7) = 0.99
+    target[0, 0, 1, 1, 0] = 1
+
+    # this is for bbox
+    predictions[0, 0, 1, 1, 1:5] = torch.rand(4)
+    target[..., 1:3] = torch.sigmoid(predictions[..., 1:3])
+    target[..., 3:5] = torch.exp(predictions[..., 3:5]) * anchors_reshaped
+
+    # this is for class
+    predictions[0, 0, 1, 1, 5:] = torch.tensor([0, 1, 0, 0, 0, 0])
+    target[0, 0, 1, 1, 5] = 1
+
+    # print(predictions[0, 0, 1, 1, ...])
+    # print(target[0, 0, 1, 1, ...])
+    # print(target[0, 0, :, :, 5])
+
+    return target, predictions, anchors
 
 
 
@@ -79,10 +108,17 @@ class Loss(nn.Module):
 if __name__ == "__main__":
 
 
-    predictions = torch.rand(1, 3, 13, 13, 11)
-    target = torch.rand(1, 3, 13, 13, 6)
-    target[..., 0:1] = 1
-    anchors = torch.rand(3, 2)
+    # def sig(x):
+    #     return 1 / (1 + torch.exp(torch.tensor(-x)))
+
+    # def inv_sig(x):
+    #     return -torch.log((1 / x) - 1)
+
+    # num = torch.tensor([0.5, 0.2, 0.1, -0.2])
+    # num1 = inv_sig(sig(num))
+    # num2 = inv_sig(torch.sigmoid(num))
+    # print(num1)
+    # print(num2)
 
     l = Loss()
     loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
