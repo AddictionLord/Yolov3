@@ -8,7 +8,7 @@ from yolo import Yolov3
 from dataset import Dataset
 from loss import Loss
 
-from utils import getLoaders, TargetTensor
+from utils import getLoaders, TargetTensor, getBboxesToEvaluate
 
 warnings.filterwarnings("ignore")
 torch.backends.cudnn.benchmark = True
@@ -124,45 +124,101 @@ class YoloTrainer:
 
 
 
+# ------------------------------------------------------
+def overfitSingleBatch(batch_size=1):
+
+    from torch.utils.data.dataloader import DataLoader
+    torch.autograd.set_detect_anomaly(True)
+
+    val_dataset = Dataset(
+        config.val_imgs_path,
+        config.val_annots_path,
+        config.ANCHORS,
+        config.CELLS_PER_SCALE,
+        config.NUM_OF_CLASSES,
+        config.train_transforms,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        shuffle=False,
+        drop_last=False,
+    )
+
+    model = Yolov3(config.yolo_config)
+    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+    loss_fcn = Loss()
+    scaler = torch.cuda.amp.GradScaler() 
+
+    model.train()
+    img, targets = next(iter(val_loader))
+    losses = list()
+    for epoch in range(config.NUM_OF_EPOCHS):
+
+        print(f'epoch {epoch}/{config.NUM_OF_EPOCHS}')
+        img = img.to(config.DEVICE)
+        targets = TargetTensor.fromDataLoader(config.SCALED_ANCHORS, targets)
+        with torch.cuda.amp.autocast():
+            output = model(img)
+            loss = targets.computeLossWith(output, loss_fcn)
+
+        losses.append(loss.item())
+        optimizer.zero_grad()
+
+        # AMP scaler, vit docs. for more
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+        print(f'actual loss: {loss}, mean loss: {torch.mean(torch.tensor(losses)).item()}')
+
+
+
+
 if __name__ == '__main__':
 
     import config
     import torch
 
-    t = YoloTrainer()
-    container = {'architecture': config.yolo_config}
+    overfitSingleBatch(1)
 
-    try:
-        t.trainYoloNet(container)
+    # t = YoloTrainer()
+    # container = {'architecture': config.yolo_config}
+    # container = YoloTrainer.loadModel('./models/stable_test.pth.tar')
 
-    except KeyboardInterrupt as e:
-        print('[YOLO TRAINER]: KeyboardInterrupt', e)
+    # try:
+    #     t.trainYoloNet(container, load=True)
 
-    except Exception as e:
-        print(e)
+    # except KeyboardInterrupt as e:
+    #     print('[YOLO TRAINER]: KeyboardInterrupt', e)
 
-    finally:
-        saved = t.model.parameters()
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/test_model.pth.tar")
+    # except Exception as e:
+    #     print(e)
+
+    # finally:
+    #     saved = t.model.parameters()
+    #     YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
 
 
-    params = YoloTrainer.loadModel("./models/test_model.pth.tar")
+    # params = YoloTrainer.loadModel("./models/test_model.pth.tar")
 
-    model = Yolov3(params['architecture'])
-    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+    # model = Yolov3(params['architecture'])
+    # optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
-    YoloTrainer.uploadParamsToModel(model, optimizer, params)
-    loaded = model.parameters()
+    # YoloTrainer.uploadParamsToModel(model, optimizer, params)
+    # loaded = model.parameters()
 
-    for parama, paramb in zip(saved, loaded):
+    # for parama, paramb in zip(saved, loaded):
 
-        a = parama
-        b = paramb
+    #     a = parama
+    #     b = paramb
 
-        if torch.rand(1).item() > 0.7:
-            break
+    #     if torch.rand(1).item() > 0.7:
+    #         break
 
-    print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
+    # print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
         
 
     
