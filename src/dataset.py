@@ -110,17 +110,12 @@ def test(data_path, annots_path):
     for image, targets in train_loader:
 
         target = TargetTensor.fromDataLoader(scaled_anchors, targets)
-        bboxes = target.getBoundingBoxesFromDataloader()
+        bboxes = target.getBoundingBoxesFromDataloader(2)
 
-        plot_image(image[0].permute(1, 2, 0).to('cpu'), bboxes)
-
-
-# ------------------------------------------------------
-# Bboxes in midpoint format
-def plot_image(image, boxes):
-
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
+        batch_size = image.shape[0]
+        for batch_img in range(batch_size):
+            
+            plot_image(image[batch_img].permute(1, 2, 0).to('cpu'), bboxes[batch_img])
 
     cmap = plt.get_cmap("tab20b")
     class_labels = config.LABELS
