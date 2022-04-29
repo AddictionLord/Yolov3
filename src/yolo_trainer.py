@@ -13,6 +13,9 @@ from thirdparty import plot_image
 
 warnings.filterwarnings("ignore")
 torch.backends.cudnn.benchmark = True
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
+# torch.cuda.set_device('cuda:0')
 
 '''
 Automatic mixed precision: 
@@ -35,8 +38,8 @@ class YoloTrainer:
     def __init__(self):
 
         self.loss = Loss()
-        # self.train_loader, self.val_loader = getLoaders() 
-        self.train_loader = getLoaders()
+        self.train_loader, self.val_loader = getLoaders() 
+        # self.train_loader = getLoaders()
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
@@ -48,7 +51,9 @@ class YoloTrainer:
     # Method to train specific Yolo architecture and return model
     def trainYoloNet(self, net: dict, load: bool=False):
 
+        print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
         self.model = Yolov3(net['architecture'])
+        self.model = self.model.to(config.DEVICE)
         self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
         if load:
             YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
@@ -57,12 +62,12 @@ class YoloTrainer:
 
             self._train(self.model, self.optimizer)
             if epoch != 0 and epoch % 4 == 0:
-                model.eval()
+                self.model.eval()
                 # TODO: Implement evaluating fcns
                 # checkClassAccuracy()
                 # preds_bboxes, target_bboxes = getBboxesToEvaluate()
                 # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
-                model.train()
+                self.model.train()
 
         return self.model, self.optimizer
 
@@ -74,8 +79,12 @@ class YoloTrainer:
         losses = list()
         for batch, (img, targets) in enumerate(loader):
 
+            t = [torch.tensor(target, device=config.DEVICE) for target in targets]
+            targets = t
+            # img = img.to(torch.float16)
             img = img.to(config.DEVICE)
             targets = TargetTensor.fromDataLoader(self.scaled_anchors, targets)
+            TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
             with torch.cuda.amp.autocast():
                 output = model(img)
                 loss = targets.computeLossWith(output, self.loss)
@@ -95,7 +104,6 @@ class YoloTrainer:
     @staticmethod
     def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
 
-        print("[YOLO TRAINER]: Model saved")
         container = {
             "state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -103,13 +111,14 @@ class YoloTrainer:
         }
 
         torch.save(container, path)
+        print(f"[YOLO TRAINER]: Model saved to {path}")
 
 
     # ------------------------------------------------------
     @staticmethod
     def loadModel(path: str="./models/test_model.pth.tar"):
 
-        print("[YOLO TRAINER]: Loading model container..")
+        print(f"[YOLO TRAINER]: Loading model container {path}")
 
         return torch.load(path, map_location=config.DEVICE)
 
@@ -126,7 +135,7 @@ class YoloTrainer:
 
 
 # ------------------------------------------------------
-def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/batch_overfit50.pth.tar'):
+def overfitSingleBatch(model, batch_size: int=1, epochs: int=50, path: str='./models/batch_overfit1000.pth.tar', load='./models/Nbatch_overfit1000.pth.tar'):
 
     from torch.utils.data.dataloader import DataLoader
     torch.autograd.set_detect_anomaly(True)
@@ -148,8 +157,13 @@ def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/ba
         drop_last=False,
     )
 
+    print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
     model = Yolov3(config.yolo_config)
+    model = model.to(config.DEVICE)
     optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+
+    container = YoloTrainer.loadModel(load)
+    YoloTrainer.uploadParamsToModel(model, optimizer, container)
     loss_fcn = Loss()
     scaler = torch.cuda.amp.GradScaler() 
 
@@ -159,10 +173,12 @@ def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/ba
     for epoch in range(epochs):
 
         print(f'epoch {epoch}/{epochs}')
+        img = img.to(torch.float16)
         img = img.to(config.DEVICE)
         targets = TargetTensor.fromDataLoader(config.SCALED_ANCHORS, targets)
         with torch.cuda.amp.autocast():
             output = model(img)
+            print(output.device)
             loss = targets.computeLossWith(output, loss_fcn)
 
         losses.append(loss.item())
@@ -273,60 +289,56 @@ if __name__ == '__main__':
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
     from yolo_trainer import YoloTrainer
 
-    device = torch.device(DEVICE)
-    transform = config.test_transforms
-    val_img = config.val_imgs_path
-    val_annots = config.val_annots_path    
-    train_img = config.train_imgs_path
-    train_annots = config.train_annots_path
-    scaled_anchors = config.SCALED_ANCHORS
-    batch_size = 1
+    # device = torch.device(DEVICE)
+    # transform = config.test_transforms
+    # val_img = config.val_imgs_path
+    # val_annots = config.val_annots_path    
+    # train_img = config.train_imgs_path
+    # train_annots = config.train_annots_path
+    # scaled_anchors = config.SCALED_ANCHORS
+    # batch_size = 1
 
-    def inv_sig(x):
-        return -torch.log((1 / x) - 1)
+    # def inv_sig(x):
+    #     return -torch.log((1 / x) - 1)
 
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-    val_dataset2 = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img2 = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
+    # val_dataset = Dataset(
+    #     config.val_imgs_path,
+    #     config.val_annots_path,
+    #     config.ANCHORS,
+    #     config.CELLS_PER_SCALE,
+    #     config.NUM_OF_CLASSES,
+    #     transform=transform
+    #     # config.test_transforms,
+    # )
+    # img = torch.utils.data.DataLoader(
+    #     val_dataset,
+    #     batch_size=batch_size,
+    #     num_workers=config.NUM_WORKERS,
+    #     pin_memory=config.PIN_MEMORY,
+    #     shuffle=False,
+    #     drop_last=False,
+    # )
+    # val_dataset2 = Dataset(
+    #     config.val_imgs_path,
+    #     config.val_annots_path,
+    #     config.ANCHORS,
+    #     config.CELLS_PER_SCALE,
+    #     config.NUM_OF_CLASSES,
+    #     transform=transform
+    #     # config.test_transforms,
+    # )
+    # img2 = torch.utils.data.DataLoader(
+    #     val_dataset,
+    #     batch_size=batch_size,
+    #     num_workers=config.NUM_WORKERS,
+    #     pin_memory=config.PIN_MEMORY,
+    #     shuffle=False,
+    #     drop_last=False,
+    # )
 
-    container = YoloTrainer.loadModel('./models/batch_overfit.pth.tar')
-    model = Yolov3(config.yolo_config)
-    model.load_state_dict(container['state_dict'])
+    # model, img = overfitSingleBatch(batch_size, 500, path='Nbatch_overfit1000.pth.tar', load='./models/batch_overfit1000.pth.tar')
 
-    model, img = overfitSingleBatch(batch_size, 50)
-
-    plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
+    # plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
 
 
     # ------------------------------------------------------------
@@ -337,23 +349,23 @@ if __name__ == '__main__':
 
 
 
-    # ------------------------------------------------------------
-    # t = YoloTrainer()
-    # container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('./models/stable_test.pth.tar')
+    # # # ------------------------------------------------------------
+    t = YoloTrainer()
+    container = {'architecture': config.yolo_config}
+    container = YoloTrainer.loadModel('./models/gpu_mse_loss_darknet.pth.tar')
 
-    # try:
-    #     t.trainYoloNet(container, load=True)
+    try:
+        t.trainYoloNet(container, load=True)
 
-    # except KeyboardInterrupt as e:
-    #     print('[YOLO TRAINER]: KeyboardInterrupt', e)
+    except KeyboardInterrupt as e:
+        print('[YOLO TRAINER]: KeyboardInterrupt', e)
 
     # except Exception as e:
     #     print(e)
 
-    # finally:
-    #     saved = t.model.parameters()
-    #     YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
+    finally:
+        saved = t.model.parameters()
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
 
 
     # params = YoloTrainer.loadModel("./models/test_model.pth.tar")
