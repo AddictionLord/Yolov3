@@ -34,7 +34,7 @@ class ResidualBlock(nn.Module):
         for layer in self.block:
 
             if self.residual:
-                x += layer(x)
+                x = x + layer(x)
 
             else:
                 x = layer(x)
