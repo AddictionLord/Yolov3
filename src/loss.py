@@ -38,7 +38,7 @@ class Loss(nn.Module):
         Inoobj = target[..., 0] == 0
 
         # loss when there is no object
-        noobj_loss = self.mse(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
         # print(f'No object loss: {noobj_loss}')
 
         # loss when there is object
@@ -79,8 +79,8 @@ def getOptimalTargetAndPreds():
 
     # anchors = torch.rand(3, 2)
     anchors = torch.tensor([[1, 1], [2, 2], [3, 3]])
-    anchors_reshaped = anchors.reshape(1, len(anchors), 1, 1, 2) 
-    predictions = torch.zeros(1, 3, 3, 3, 11)
+    anchors_reshaped = anchors.reshape(1, len(anchors), 1, 1, 2)
+    predictions = torch.zeros(1, 3, 13, 13, 11)
     target = predictions[..., 0:6].detach().clone() #torch.rand(1, 3, 13, 13, 6)
 
     # this is for score
@@ -119,6 +119,7 @@ if __name__ == "__main__":
     # num2 = inv_sig(torch.sigmoid(num))
     # print(num1)
     # print(num2)
+    target, predictions, anchors = getOptimalTargetAndPreds()
 
     l = Loss()
     loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
