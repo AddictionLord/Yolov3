@@ -26,8 +26,8 @@ class TargetTensor:
     def computeLossWith(self, preds: list, loss_fcn):
 
         targets, d = self.tensor, torch.device(config.DEVICE)
-        TargetTensor.passTargetsToDevice(preds, d) if preds[0].device != d else None
-        TargetTensor.passTargetsToDevice(targets, d) if targets[0].device != d else None
+        TargetTensor.passTargetsToDevice(preds, d)
+        TargetTensor.passTargetsToDevice(targets, d)
 
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
