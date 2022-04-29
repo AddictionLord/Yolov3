@@ -80,22 +80,26 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Get BB from dataloader (no need to iterate over all scales)
-    def getBoundingBoxesFromDataloader(self):
+    def getBoundingBoxesFromDataloader(self, scale):
 
         num_of_anchors = self.num_of_anchors_per_scale
         bboxes = TargetTensor.convertCellsToBoundingBoxes(
-            self.tensor[0], False, self.anchors[0]
-        )[0]
-        bboxes = nonMaxSuppression(bboxes, 1, 0.99)
+            self.tensor[scale], False, self.anchors[scale]
+        )
+        for batch_img, _ in enumerate(bboxes):
+            
+            bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
 
         return bboxes
 
 
     # ------------------------------------------------------
-    # Takes one tensor on scale and returns list of all BB
+    # Takes one tensor for one scale and returns list of all BB
     # tensor: [BATCH, A, S, S, 6] -> 6: [score, x, y, w, h, classification]
+    # anchor should be in scaled_anchors form
+    # RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
-    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor):
+    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor, threshold=False):
 
         batch, num_anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
 
@@ -112,12 +116,24 @@ class TargetTensor:
         y = (cell_indices.permute(0, 1, 3, 2, 4) + tensor[..., 2:3]) * (1 / cells)
         wh = tensor[..., 3:5] / cells
 
-        return torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
-            batch, num_anchors * cells * cells, 6).tolist()
+        if threshold:
+            bboxes = list()
+            b = torch.cat((classes, scores, x, y, wh), dim=-1).reshape(batch, -1, 6)
+            condition = (b[..., 1:2] >= threshold) #.reshape(1, batch, cells, cells, 1)
+            condition = condition.repeat(1, 1, 1, 1, 6).reshape(batch, -1, 6)
+            for idx, batch_tensor in enumerate(b):
+
+                bboxes.append(batch_tensor[condition[idx]].reshape(-1, 6))
+
+        else:
+            bboxes = torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
+                batch, num_anchors * cells * cells, 6).tolist()
+
+        return bboxes
 
 
     # ------------------------------------------------------
-    # anchors.shape [3, 2] rquired, this is for only one scale
+    # scaled_anchors.shape [3, 2] rquired, this is for only one scale
     @staticmethod
     def convertPredsToBoundingBox(tensor: torch.tensor, anchors: torch.tensor):
 
@@ -182,7 +198,47 @@ class TargetTensor:
 
 
 
-if __name__ == '_main_':
+if __name__ == '__main__':
 
-    pass
+    # batch = 2
+    # t = torch.zeros(1, batch, 3, 3, 6)
+    # t[0, 0, 1, 1, ...] = 1
+    # t[0, 0, 0, 0, ...] = 2
+    # t[0, 1, 1, 1, ...] = 3
+    # t[0, 1, 2, 1, ...] = 4
+    # t[0, 1, 1, 0, ...] = 5
 
+    # t[0, 0, 1, 1, 1] = 1
+    # t[0, 0, 0, 0, 1] = 1
+    # t[0, 1, 1, 1, 1] = 1
+    # t[0, 1, 2, 1, 1] = 1
+    # t[0, 1, 1, 0, 1] = 1
+
+    # condition = t[..., 1] >= 0.8
+    # condition = condition.reshape(1, batch, 3, 3, 1).repeat(1, 1, 1, 1, 6).reshape(batch, -1, 6)
+    # # condition = condition.reshape(batch, -1, 6)
+
+    # t = t.reshape(batch, -1, 6)
+
+    # bboxes, batch_bboxes = list(), [torch.tensor([]) for _ in range(batch)]
+    # for idx, batch_tensor in enumerate(t):
+
+    #     bboxes.append(batch_tensor[condition[idx]].reshape(-1, 6))
+    #     # bboxes[idx] += batch_tensor[condition[idx]].reshape(-1, 6).tolist()
+
+    # for batch_img_id, (box) in enumerate(bboxes):
+
+    #     batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
+        
+    # print(batch_bboxes)
+
+    from torchvision.ops import box_convert
+    xyxy = box_convert(torch.tensor([0.5, 0.5, 0.4, 0.4]), 'cxcywh', 'xyxy')
+    print(xyxy)
+
+    t = torch.zeros(4, 6)
+    t[..., 0] = torch.tensor([1, 2, 3, 4])
+    indices = torch.tensor([0, 2])
+
+    s = torch.index_select(t, dim=0, index=indices)
+    print(s)
