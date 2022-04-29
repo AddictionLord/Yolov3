@@ -34,8 +34,7 @@ class YoloTrainer:
     def __init__(self):
 
         self.loss = Loss()
-        # self.train_loader, self.val_loader = getLoaders() 
-        self.train_loader = getLoaders()
+        self.train_loader, self.val_loader = getLoaders() 
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
@@ -56,12 +55,12 @@ class YoloTrainer:
 
             self._train(self.model, self.optimizer)
             if epoch != 0 and epoch % 4 == 0:
-                model.eval()
+                self.model.eval()
                 # TODO: Implement evaluating fcns
                 # checkClassAccuracy()
                 # preds_bboxes, target_bboxes = getBboxesToEvaluate()
                 # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
-                model.train()
+                self.model.train()
 
         return self.model, self.optimizer
 
@@ -87,14 +86,14 @@ class YoloTrainer:
             self.scaler.step(optimizer)
             self.scaler.update()
 
-            loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
+            loader.set_postfix(loss=loss.item(), mean_loss=torch.mean(torch.tensor(losses)).item())
 
 
     # ------------------------------------------------------
     @staticmethod
     def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
 
-        print("[YOLO TRAINER]: Model saved")
+        print(f"[YOLO TRAINER]: Saving model to {path}")
         container = {
             "state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -108,7 +107,7 @@ class YoloTrainer:
     @staticmethod
     def loadModel(path: str="./models/test_model.pth.tar"):
 
-        print("[YOLO TRAINER]: Loading model container..")
+        print(f"[YOLO TRAINER]: Loading model container: {path}")
 
         return torch.load(path, map_location=config.DEVICE)
 
@@ -117,13 +116,14 @@ class YoloTrainer:
     @staticmethod
     def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
 
-        print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
+        print("[YOLO TRAINER]: Uploading parameters to model and optimizer")
         model.load_state_dict(params['state_dict'])
         optimizer.load_state_dict(params['optimizer'])
 
 
 
 
+# ------------------------------------------------------
 if __name__ == '__main__':
 
     import config
@@ -131,9 +131,11 @@ if __name__ == '__main__':
 
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
+    container = YoloTrainer.loadModel("./models/gpu_mse_loss_darknet.pth.tar")
 
     try:
-        t.trainYoloNet(container)
+        t.trainYoloNet(container, load=True)
+        # t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -143,27 +145,17 @@ if __name__ == '__main__':
 
     finally:
         saved = t.model.parameters()
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/test_model.pth.tar")
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_mse_loss_darknet.pth.tar")
 
 
-    params = YoloTrainer.loadModel("./models/test_model.pth.tar")
+    # params = YoloTrainer.loadModel("./models/test_model.pth.tar")
 
-    model = Yolov3(params['architecture'])
-    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+    # model = Yolov3(params['architecture'])
+    # optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
 
-    YoloTrainer.uploadParamsToModel(model, optimizer, params)
-    loaded = model.parameters()
+    # YoloTrainer.uploadParamsToModel(model, optimizer, params)
+    # loaded = model.parameters()
 
-    for parama, paramb in zip(saved, loaded):
-
-        a = parama
-        b = paramb
-
-        if torch.rand(1).item() > 0.7:
-            break
-
-    print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
-        
 
     
 
