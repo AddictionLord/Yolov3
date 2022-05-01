@@ -37,21 +37,28 @@ class Loss(nn.Module):
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
 
-        # loss when there is no object
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-        # print(f'No object loss: {noobj_loss}')
+
 
         # loss when there is object
-        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.clone(), anchors.clone())
+        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
         obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         # print(f'Object loss: {obj_loss}')
 
+        # loss when there is no object
+        noobj_loss = self.bce(preds[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # print(f'No object loss: {noobj_loss}')
+
         # box coordinates loss
-        xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
-        target[..., 3:5] = torch.log(1e-16 + target[..., 3:5] / anchors)
-        wh_loss = self.mse(predictions[..., 3:5][Iobj], target[..., 3:5][Iobj])
-        box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+        # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
+        # target_wh_recomputed = torch.log(1e-8 + target[..., 3:5] / anchors)
+        # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
+        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+
+        # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
+        # wh_loss = self.mse(preds[..., 3:5][Iobj], target[..., 3:5][Iobj])
+        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+        box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
         # print(f'Box loss: {box_loss}')
 
         # class loss
@@ -70,7 +77,6 @@ class Loss(nn.Module):
             + self.lambda_noobj * noobj_loss
             + class_loss
         )
-
 
 
 

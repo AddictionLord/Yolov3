@@ -33,6 +33,7 @@ class TargetTensor:
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
             # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
+            print(self.anchors)
             loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
         return loss
@@ -162,7 +163,8 @@ class TargetTensor:
     # iou_idx is index of bbox from argsorted iou(bbox, anchor) scores
     def determineAnchorAndScale(self, iou_idx: int):
 
-        self.scale = iou_idx // self.num_of_anchors_per_scale 
+        # self.scale = iou_idx // self.num_of_anchors_per_scale 
+        self.scale = torch.div(iou_idx, self.num_of_anchors_per_scale, rounding_mode='floor')
         self.anchor = iou_idx % self.num_of_anchors_per_scale
 
         return self.scale, self.anchor

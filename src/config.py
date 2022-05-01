@@ -14,12 +14,12 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
-BATCH_SIZE = 4
+BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
-NUM_OF_EPOCHS = 100
-LEARNING_RATE = 1e-7
+NUM_OF_EPOCHS = 3000
+LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-4
 LAMBDA_COORD = 5 #10
 LAMBDA_NOOBJ = 0.5 #10
