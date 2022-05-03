@@ -8,7 +8,7 @@ from yolo import Yolov3
 from dataset import Dataset
 from loss import Loss
 
-from utils import getLoaders, TargetTensor, getBboxesToEvaluate
+from utils import getLoaders, TargetTensor, getBboxesToEvaluate, getValLoader
 from thirdparty import plot_image
 
 warnings.filterwarnings("ignore")
@@ -182,8 +182,6 @@ def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/ba
     return model, img
 
 
-
-
 # ------------------------------------------------------
 def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
@@ -191,6 +189,7 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
     if isinstance(loader, torch.utils.data.DataLoader):
         img, targets = next(iter(loader))
+        # plot_image(img[0].permute(1,2,0).detach().cpu())
 
     else:
         img = loader
@@ -205,6 +204,9 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
         batch_bboxes = [torch.tensor([]) for _ in range(img.shape[0])]
         for scale, pred_on_scale in enumerate(preds):
 
+            mask = targets[scale][..., 0:1] == 1
+            print(torch.sum(pred_on_scale[..., 0:1][mask]))
+
             boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
                 pred_on_scale, True, anchors[scale], thresh
             )
@@ -217,24 +219,24 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
     for batch_img_id, b_bboxes in enumerate(batch_bboxes):
 
         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
+        nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
         nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
-
+        print(b_bboxes[..., 1:6])
         plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
 
 
 # ------------------------------------------------------------
-def createPerfectPredictionTensor(loader):
+def createPerfectPredictionTensor(loader, scale):
 
     image, target = next(iter(loader))
     # plot_image(image[0].permute(1,2,0).detach().cpu())
 
-    condition = (target[0][..., 0:1] == 1)
+    condition = (target[scale][..., 0:1] == 1)
     condition = condition.repeat(1, 1, 1, 1, 6)#.reshape(batch_size, -1, 6)
-    target[0][condition].reshape(-1, 6)
+    target[scale][condition].reshape(-1, 6)
     # print(target[0][condition].reshape(-1, 6))
 
-    values_idx = (target[0][..., 0:1] == 1).nonzero()
+    values_idx = (target[scale][..., 0:1] == 1).nonzero()
     values_idx = values_idx[..., 2:4].tolist()
 
     preds = target.copy()
@@ -248,6 +250,9 @@ def createPerfectPredictionTensor(loader):
     preds[0][0, 0, 6, 7, 5] = 6
     preds[0][0, 0, 6, 8, 5] = 6
 
+    print(preds[0][0, 0, 6, 7, 5])
+    print(preds[0][0, 0, 6, 8, 5])
+
 
     back_target = target.copy()
     back_target[0][..., 0:3] = torch.sigmoid(preds[0][..., 0:3])
@@ -259,7 +264,34 @@ def createPerfectPredictionTensor(loader):
     # print(target[0][0, 0, 6, 7, ...])
     # print(back_target[0][0, 0, 6, 7, ...])
 
-    return preds
+    return preds, image
+
+
+# ------------------------------------------------------------
+def inspectPred(model, loader):
+
+    img, target = next(iter(loader))
+    img = img.to(device)
+    model = model.to(device)
+    model.train()
+
+    with torch.no_grad():
+
+        out = model(img)
+
+    out[0], _ = TargetTensor.convertPredsToBoundingBox(out[0], config.SCALED_ANCHORS[0])
+    classes = torch.argmax(out[0][..., 5:], dim=-1).unsqueeze(-1)
+
+    b = torch.cat((classes, out[0][..., 0:5]), dim=-1)
+    fltr = b[..., 1] > 0.01
+    print(fltr.nonzero().tolist())
+    print(b[fltr])
+
+    # print(out[0][0, 0, 6, 7, 5:])
+    print(b[0, 0, 6, 7, ...])
+    print(b[0, 0, 6, 8, ...])
+
+
 
 
 
@@ -272,6 +304,7 @@ if __name__ == '__main__':
     from dataset import Dataset
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
     from yolo_trainer import YoloTrainer
+    from utils import getLoaders
 
     device = torch.device(DEVICE)
     transform = config.test_transforms
@@ -285,54 +318,26 @@ if __name__ == '__main__':
     def inv_sig(x):
         return -torch.log((1 / x) - 1)
 
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-    val_dataset2 = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img2 = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
 
-    container = YoloTrainer.loadModel('./models/batch_overfit.pth.tar')
+    loader = getValLoader()
+
+    container = YoloTrainer.loadModel('./models/gpu_test_loss4.pth.tar')
     model = Yolov3(config.yolo_config)
     model.load_state_dict(container['state_dict'])
 
-    model, img = overfitSingleBatch(batch_size, 50)
+    inspectPred(model, loader)
 
-    plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
+    # model, img = overfitSingleBatch(batch_size, 50)
+
+    plotDetections(model, loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)#torch.tensor([config.ANCHORS]).reshape(-1, 3, 2))
+
 
 
     # ------------------------------------------------------------
     # Test of plotting fcns and bbox calculations 
 
-    # preds = createPerfectPredictionTensor(loader)
+    # preds, image = createPerfectPredictionTensor(loader, 0)
+
     # plotDetections(model, image, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS, preds)
 
 
