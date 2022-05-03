@@ -12,11 +12,10 @@ from utils import nonMaxSuppression
 class TargetTensor:
     def __init__(self, anchors: torch.Tensor, scales_cells: list):
 
-        self.anchors = anchors
         self.cells = scales_cells #number of cells in each scale
-
         self.num_of_anchors = anchors.shape[0]
         self.num_of_anchors_per_scale = self.num_of_anchors // len(self.cells)
+        self.anchors = anchors.reshape(-1, 3, 2)
 
         self.tensor = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.cells]
 
@@ -33,7 +32,7 @@ class TargetTensor:
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
             # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
-            print(self.anchors)
+            # print(self.anchors)
             loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
         return loss
@@ -51,13 +50,14 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Used to create instance from different data than original constructor,
-    # scaled_anchors sould be confing.SCALED_ANCHORS
+    # anchors sould be torch.tensor(config.ANCHORS)
     @classmethod
-    def fromDataLoader(cls, scaled_anchors: torch.tensor, targets: list):
+    def fromDataLoader(cls, anchors: torch.tensor, targets: list):
 
+        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
-        tt = cls(scaled_anchors.reshape(-1, 2), scales_cells)
-        tt.anchors, tt.tensor = scaled_anchors, targets
+        tt = cls(anchors, scales_cells)
+        tt.tensor = targets
 
         return tt
 
@@ -83,10 +83,7 @@ class TargetTensor:
     # Get BB from dataloader (no need to iterate over all scales)
     def getBoundingBoxesFromDataloader(self, scale):
 
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = TargetTensor.convertCellsToBoundingBoxes(
-            self.tensor[scale], False, self.anchors[scale]
-        )
+        bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
         for batch_img, _ in enumerate(bboxes):
             
             bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
