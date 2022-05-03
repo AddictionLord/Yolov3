@@ -93,7 +93,7 @@ class Dataset(CocoDetection):
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
                     targets.setProbabilityToCell(cx, cy, -1)
 
-        return image, tuple(targets)
+        return image.to(torch.float16), tuple(targets.tensor)
 
 
 

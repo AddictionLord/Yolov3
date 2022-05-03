@@ -42,8 +42,8 @@ class Loss(nn.Module):
         # print(f'No object loss: {noobj_loss}')
 
         # loss when there is object
-        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.detach().clone(), anchors.detach().clone())
-        ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]).detach()
+        preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions.clone(), anchors.clone())
+        ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
         obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         # print(f'Object loss: {obj_loss}')
 
