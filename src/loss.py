@@ -16,7 +16,7 @@ class Loss(nn.Module):
     def __init__(self):
         super().__init__()
         self.mse = nn.MSELoss()
-        self.bce = nn.BCEWithLogitsLoss()
+        self.bce = nn.BCEWithLogitsLoss(reduction='mean')
         self.entropy = nn.CrossEntropyLoss()
         self.sigmoid = nn.Sigmoid()
 
@@ -37,17 +37,21 @@ class Loss(nn.Module):
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
 
-
+        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
 
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-        # print(f'Object loss: {obj_loss}')
+        # obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        print('preds: ', predictions[..., 0:1][Iobj])
+        print('targets: ', target[..., 0:1][Iobj])
+        obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
+        print()
+        print(f'Object loss: {obj_loss}')
 
         # loss when there is no object
-        noobj_loss = self.bce(preds[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-        # print(f'No object loss: {noobj_loss}')
+        # noobj_loss = self.bce(preds[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        print(f'No object loss: {noobj_loss}')
 
         # box coordinates loss
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
@@ -59,22 +63,22 @@ class Loss(nn.Module):
         # wh_loss = self.mse(preds[..., 3:5][Iobj], target[..., 3:5][Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
         box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        # print(f'Box loss: {box_loss}')
+        print(f'Box loss: {box_loss}')
 
         # class loss
         class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
-        # print(f'Class loss: {class_loss}')
-
+        print(f'Class loss: {class_loss}')
+        
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         noobj_loss[torch.isnan(noobj_loss)]     = 0
-        obj_loss[torch.isnan(obj_loss)]         = 0
+        # obj_loss[torch.isnan(obj_loss)]         = 0
         box_loss[torch.isnan(box_loss)]         = 0
         class_loss[torch.isnan(class_loss)]     = 0
 
         # loss fcn
-        return (self.lambda_coord * box_loss
-            + obj_loss 
-            + self.lambda_noobj * noobj_loss
+        return (self.lambda_coord * box_loss 
+            + obj_loss * 10
+            + self.lambda_noobj * noobj_loss 
             + class_loss
         )
 
@@ -125,11 +129,11 @@ if __name__ == "__main__":
     # num2 = inv_sig(torch.sigmoid(num))
     # print(num1)
     # print(num2)
-    target, predictions, anchors = getOptimalTargetAndPreds()
+    # target, predictions, anchors = getOptimalTargetAndPreds()
 
-    l = Loss()
-    loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
-    print(f"Loss: {loss}")
+    # l = Loss()
+    # loss = l(predictions.detach().clone(), target.detach().clone(), anchors.detach().clone())
+    # print(f"Loss: {loss}")
 
     # -------------------------------------------
     # mse = nn.MSELoss()
@@ -154,3 +158,8 @@ if __name__ == "__main__":
     #     cnt += torch.allclose(mymse, tmse)
 
     # print(cnt)
+
+    bce = nn.BCEWithLogitsLoss()
+    i = torch.FloatTensor([7, 7])
+    t = torch.FloatTensor([1, 1])
+    print(bce(i, t))

@@ -42,12 +42,13 @@ class YoloTrainer:
         self.train_loader, self.val_loader = getLoaders() 
         # self.train_loader = getLoaders()
         self.scaler = torch.cuda.amp.GradScaler() 
+        self.anchors = config.ANCHORS
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
         self.model = None
         self.optimizer = None
 
-    
+
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model
     def trainYoloNet(self, net: dict, load: bool=False):
@@ -61,15 +62,30 @@ class YoloTrainer:
             YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
 
         w = self.model.yolo[0].block[0].weight.data.clone()
-        img, targets = next(iter(self.val_loader))
+        # img, targets = next(iter(self.val_loader))
+
+        anchors = config.ANCHORS
+        transform = config.test_transforms
+        val_img = config.val_imgs_path
+        val_annots = config.val_annots_path
+
+        d = Dataset(val_img, val_annots, anchors, transform=transform)
+        img, targets = d[0]
+        targets = list(targets)
+        print(type(targets))
+        for i in range(len(targets)):
+            targets[i] = torch.unsqueeze(targets[i], 0)
+        img = img.unsqueeze(0)
+        print(targets[0].shape)
+
         img = img.to(config.DEVICE)
         t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-        targets = TargetTensor.fromDataLoader(self.scaled_anchors, t)
+        targets = TargetTensor.fromDataLoader(self.anchors, t)
         TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
         for epoch in range(config.NUM_OF_EPOCHS):
 
             self._train(self.model, self.optimizer, img.detach().clone(), targets)
-            if epoch != 0 and epoch % 250 == 0:
+            if epoch != 0 and epoch % 10000 == 0:
                 print(f'{epoch}/{config.NUM_OF_EPOCHS}')
                 # self.model.eval()
                 # TODO: Implement evaluating fcns
@@ -81,9 +97,9 @@ class YoloTrainer:
                 # preds, target = convertDataToMAP(preds_bboxes, target_bboxes)
                 # self.mAP.update(preds, target)
                 # self.model.train()
-                # for g in self.optimizer.param_groups:
-                #      g['lr'] = config.LEARNING_RATE / 2
-                #      print(f'learning rate modified: {g["lr"]}')
+                for g in self.optimizer.param_groups:
+                     g['lr'] = config.LEARNING_RATE / 2
+                     print(f'learning rate modified: {g["lr"]}')
 
         # print(w == self.model.yolo[0].block[0].weight.data)
 
@@ -96,8 +112,12 @@ class YoloTrainer:
         losses = list()
         with torch.cuda.amp.autocast():
             output = model(img)
+            # print(output[0][0, 0, 6, 7, ...])
+            # print(output[0][0, 0, 6, 6, ...])
+            # print(output[1][0, 0, 12, 15, ...])
+            # print(output[2][0, 0, 24, 31, ...])
             loss = targets.computeLossWith(output, self.loss)
-
+        
         losses.append(loss.item())
         print(f'Loss: {loss.item()}, Mean loss: {torch.mean(torch.tensor(losses)).item()}')
         optimizer.zero_grad()
@@ -356,11 +376,11 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('./models/gpu_balanced.pth.tar')
+    # container = YoloTrainer.loadModel('./models/gpu_balanced.pth.tar')
 
     try:
-        t.trainYoloNet(container, load=True)
-        # t.trainYoloNet(container)
+        # t.trainYoloNet(container, load=True)
+        t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -369,7 +389,7 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_test_loss.pth.tar")
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_test_loss3.pth.tar")
 
 
 
