@@ -27,7 +27,7 @@ class Dataset(CocoDetection):
         self.root = root
         self.annFile = annFile
 
-        self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64)
+        self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float16)
         self.S = S
         self.C = C
         self.transform = transform
