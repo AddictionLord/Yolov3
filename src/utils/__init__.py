@@ -4,7 +4,7 @@ from .intersection_over_union import iouBetweenBboxAnchor
 from .intersection_over_union import intersectionOverUnion  
 from .non_max_suprression import nonMaxSuppression, softNonMaxSuppression
 from .target_tensor import TargetTensor
-from .mean_average_precision import meanAveragePrecision
+from .mean_average_precision import convertDataToMAP
 from .get_loaders import getLoaders
 from .get_loaders import getValLoader
 from .get_bboxes_to_evaluate import getBboxesToEvaluate

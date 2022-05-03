@@ -14,8 +14,8 @@ from thirdparty import plot_image
 
 # warnings.filterwarnings("ignore")
 torch.backends.cudnn.benchmark = True
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
+# if torch.cuda.is_available():
+#     torch.cuda.empty_cache()
 # torch.cuda.set_device('cuda:0')
 
 '''
@@ -42,12 +42,13 @@ class YoloTrainer:
         self.train_loader, self.val_loader = getLoaders() 
         # self.train_loader = getLoaders()
         self.scaler = torch.cuda.amp.GradScaler() 
+        self.anchors = config.ANCHORS
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
         self.model = None
         self.optimizer = None
 
-    
+
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model
     def trainYoloNet(self, net: dict, load: bool=False):
@@ -57,59 +58,76 @@ class YoloTrainer:
         self.model = self.model.to(config.DEVICE)
         self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
         self.mAP = MeanAveragePrecision()
-        
         if load:
             YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
 
         w = self.model.yolo[0].block[0].weight.data.clone()
+        # img, targets = next(iter(self.val_loader))
+
+        anchors = config.ANCHORS
+        transform = config.test_transforms
+        val_img = config.val_imgs_path
+        val_annots = config.val_annots_path
+
+        d = Dataset(val_img, val_annots, anchors, transform=transform)
+        img, targets = d[0]
+        targets = list(targets)
+        print(type(targets))
+        for i in range(len(targets)):
+            targets[i] = torch.unsqueeze(targets[i], 0)
+        img = img.unsqueeze(0)
+        print(targets[0].shape)
+
+        img = img.to(config.DEVICE)
+        t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
+        targets = TargetTensor.fromDataLoader(self.anchors, t)
+        TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
         for epoch in range(config.NUM_OF_EPOCHS):
 
-            self._train(self.model, self.optimizer)
-            if epoch != 0 and epoch % 20 == 0:
+            self._train(self.model, self.optimizer, img.detach().clone(), targets)
+            if epoch != 0 and epoch % 10000 == 0:
                 print(f'{epoch}/{config.NUM_OF_EPOCHS}')
-                self.model.eval()
+                # self.model.eval()
                 # TODO: Implement evaluating fcns
                 # checkClassAccuracy()
                 # preds_bboxes, target_bboxes = getBboxesToEvaluate(
                 #     self.model, self.val_loader, anchors.copy(), device, config.PROBABILITY_THRESHOLD
                 # )
+                # mAP = meanAveragePrecision(preds_bboxes, target_bboxes)
                 # preds, target = convertDataToMAP(preds_bboxes, target_bboxes)
                 # self.mAP.update(preds, target)
                 # self.model.train()
                 for g in self.optimizer.param_groups:
-                     g['lr'] /= 10
+                     g['lr'] = config.LEARNING_RATE / 2
                      print(f'learning rate modified: {g["lr"]}')
 
-        print(w == self.model.yolo[0].block[0].weight.data)
+        # print(w == self.model.yolo[0].block[0].weight.data)
 
         return self.model, self.optimizer
 
 
     # ------------------------------------------------------
-    def _train(self, model: Yolov3, optimizer: torch.optim):
+    def _train(self, model: Yolov3, optimizer: torch.optim, img, targets):
 
-        loader = tqdm(self.train_loader)
         losses = list()
-        for batch, (img, targets) in enumerate(loader):
+        with torch.cuda.amp.autocast():
+            output = model(img)
+            # print(output[0][0, 0, 6, 7, ...])
+            # print(output[0][0, 0, 6, 6, ...])
+            # print(output[1][0, 0, 12, 15, ...])
+            # print(output[2][0, 0, 24, 31, ...])
+            loss = targets.computeLossWith(output, self.loss)
+        
+        losses.append(loss.item())
+        print(f'Loss: {loss.item()}, Mean loss: {torch.mean(torch.tensor(losses)).item()}')
+        optimizer.zero_grad()
 
-            t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-            # img = img.to(torch.float16)
-            img = img.to(config.DEVICE)
-            targets = TargetTensor.fromDataLoader(self.scaled_anchors, t)
-            TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
-            with torch.cuda.amp.autocast():
-                output = model(img)
-                loss = targets.computeLossWith(output, self.loss)
+        # AMP scaler, see docs. for more
+        self.scaler.scale(loss).backward()
+        self.scaler.step(optimizer)
+        self.scaler.update()
 
-            losses.append(loss.item())
-            optimizer.zero_grad()
 
-            # AMP scaler, see docs. for more
-            self.scaler.scale(loss).backward()
-            self.scaler.step(optimizer)
-            self.scaler.update()
-
-            loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
 
 
     # ------------------------------------------------------
@@ -231,7 +249,6 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
     if isinstance(loader, torch.utils.data.DataLoader):
         img, targets = next(iter(loader))
-        # plot_image(img[0].permute(1,2,0).detach().cpu())
 
     else:
         img = loader
@@ -245,9 +262,6 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
         batch_bboxes = [torch.tensor([]) for _ in range(img.shape[0])]
         for scale, pred_on_scale in enumerate(preds):
-
-            mask = targets[scale][..., 0:1] == 1
-            print(torch.sum(pred_on_scale[..., 0:1][mask]))
 
             boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
                 pred_on_scale, True, anchors[scale], thresh
@@ -263,22 +277,22 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
         nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
         nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
-        print(b_bboxes[..., 1:6])
+
         plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
 
 
 # ------------------------------------------------------------
-def createPerfectPredictionTensor(loader, scale):
+def createPerfectPredictionTensor(loader):
 
     image, target = next(iter(loader))
     # plot_image(image[0].permute(1,2,0).detach().cpu())
 
-    condition = (target[scale][..., 0:1] == 1)
+    condition = (target[0][..., 0:1] == 1)
     condition = condition.repeat(1, 1, 1, 1, 6)#.reshape(batch_size, -1, 6)
-    target[scale][condition].reshape(-1, 6)
+    target[0][condition].reshape(-1, 6)
     # print(target[0][condition].reshape(-1, 6))
 
-    values_idx = (target[scale][..., 0:1] == 1).nonzero()
+    values_idx = (target[0][..., 0:1] == 1).nonzero()
     values_idx = values_idx[..., 2:4].tolist()
 
     preds = target.copy()
@@ -292,9 +306,6 @@ def createPerfectPredictionTensor(loader, scale):
     preds[0][0, 0, 6, 7, 5] = 6
     preds[0][0, 0, 6, 8, 5] = 6
 
-    print(preds[0][0, 0, 6, 7, 5])
-    print(preds[0][0, 0, 6, 8, 5])
-
 
     back_target = target.copy()
     back_target[0][..., 0:3] = torch.sigmoid(preds[0][..., 0:3])
@@ -306,34 +317,7 @@ def createPerfectPredictionTensor(loader, scale):
     # print(target[0][0, 0, 6, 7, ...])
     # print(back_target[0][0, 0, 6, 7, ...])
 
-    return preds, image
-
-
-# ------------------------------------------------------------
-def inspectPred(model, loader):
-
-    img, target = next(iter(loader))
-    img = img.to(device)
-    model = model.to(device)
-    model.train()
-
-    with torch.no_grad():
-
-        out = model(img)
-
-    out[0], _ = TargetTensor.convertPredsToBoundingBox(out[0], config.SCALED_ANCHORS[0])
-    classes = torch.argmax(out[0][..., 5:], dim=-1).unsqueeze(-1)
-
-    b = torch.cat((classes, out[0][..., 0:5]), dim=-1)
-    fltr = b[..., 1] > 0.01
-    print(fltr.nonzero().tolist())
-    print(b[fltr])
-
-    # print(out[0][0, 0, 6, 7, 5:])
-    print(b[0, 0, 6, 7, ...])
-    print(b[0, 0, 6, 8, ...])
-
-
+    return preds
 
 
 
@@ -345,7 +329,6 @@ if __name__ == '__main__':
     from yolo import Yolov3
     from dataset import Dataset
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
-    from yolo_trainer import YoloTrainer
 
     device = torch.device(DEVICE)
     transform = config.test_transforms
@@ -359,23 +342,23 @@ if __name__ == '__main__':
     def inv_sig(x):
         return -torch.log((1 / x) - 1)
 
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
+    # val_dataset = Dataset(
+    #     config.val_imgs_path,
+    #     config.val_annots_path,
+    #     config.ANCHORS,
+    #     config.CELLS_PER_SCALE,
+    #     config.NUM_OF_CLASSES,
+    #     transform=transform
+    #     # config.test_transforms,
+    # )
+    # img = torch.utils.data.DataLoader(
+    #     val_dataset,
+    #     batch_size=batch_size,
+    #     num_workers=config.NUM_WORKERS,
+    #     pin_memory=config.PIN_MEMORY,
+    #     shuffle=False,
+    #     drop_last=False,
+    # )
 
     # model, img = overfitSingleBatch(batch_size, 50, path='Nbatch_overfit1000.pth.tar', load='./models/gpu_darknet.pth.tar')
 
@@ -385,8 +368,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     # Test of plotting fcns and bbox calculations 
 
-    # preds, image = createPerfectPredictionTensor(loader, 0)
-
+    # preds = createPerfectPredictionTensor(loader)
     # plotDetections(model, image, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS, preds)
 
 
@@ -394,11 +376,11 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('./models/gpu_training_overnight.pth.tar')
+    # container = YoloTrainer.loadModel('./models/gpu_balanced.pth.tar')
 
     try:
-        t.trainYoloNet(container, load=True)
-        # t.trainYoloNet(container)
+        # t.trainYoloNet(container, load=True)
+        t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -407,8 +389,7 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        saved = t.model.parameters()
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_test_loss3.pth.tar")
 
 
 
