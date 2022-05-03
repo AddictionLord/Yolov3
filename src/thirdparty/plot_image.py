@@ -6,6 +6,7 @@ import sys
 
 sys.path.insert(1, '/home/mary/thesis/project/src/')
 import config
+from dataset import Dataset
 
 '''
 THIRD PARTY package, sources:
@@ -65,6 +66,23 @@ def plot_image(image, boxes=None):
             )
 
     plt.show()
+
+
+
+if __name__ == '__main__':
+
+    anchors = config.ANCHORS
+    transform = config.test_transforms
+    val_img = config.val_imgs_path
+    val_annots = config.val_annots_path
+
+    d = Dataset(val_img, val_annots, anchors, transform=transform)
+    img, targets = d[2]
+    print(len(targets))
+    print(targets[0].unsqueeze(0).shape)
+    plot_image(img.permute(1, 2, 0).to('cpu'))
+
+
 
 
 
