@@ -49,6 +49,29 @@ def getLoaders():
     return train_loader, val_loader
 
 
+# ------------------------------------------------------
+def getValLoader():
+    
+    val_dataset = Dataset(
+        config.val_imgs_path,
+        config.val_annots_path,
+        config.ANCHORS,
+        config.CELLS_PER_SCALE,
+        config.NUM_OF_CLASSES,
+        config.test_transforms,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config.BATCH_SIZE,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        shuffle=False,
+        drop_last=False,
+    )
+
+    return val_loader
+
 
 
 
