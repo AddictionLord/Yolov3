@@ -38,7 +38,7 @@ class Loss(nn.Module):
         Inoobj = target[..., 0] == 0
 
         # loss when there is no object
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
         # print(f'No object loss: {noobj_loss}')
 
         # loss when there is object
@@ -48,11 +48,15 @@ class Loss(nn.Module):
         # print(f'Object loss: {obj_loss}')
 
         # box coordinates loss
-        xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
-        target[..., 3:5] = torch.log(1e-16 + target[..., 3:5] / anchors)
-        wh_loss = self.mse(predictions[..., 3:5][Iobj], target[..., 3:5][Iobj])
-        box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+        # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
+        # target[..., 3:5] = torch.log(1e-16 + target[..., 3:5] / anchors)
+        # wh_loss = self.mse(predictions[..., 3:5][Iobj], target[..., 3:5][Iobj])
+        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
         # print(f'Box loss: {box_loss}')
+        box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+
+
+        noobj_loss = self.bce(preds[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
 
         # class loss
         class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
