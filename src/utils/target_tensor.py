@@ -84,9 +84,19 @@ class TargetTensor:
     def getBoundingBoxesFromDataloader(self, scale):
 
         bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
-        for batch_img, _ in enumerate(bboxes):
+        # when .tolist() returns len(bboxes[0]) = 8112 means:
+        # [[(batch_img_1)[bb1], [bb2], [bb3], ...], [(batch_img_2)[bb1], [bb2], ..]]
+        # without returns tensor of size [batch, num_bboxes, 6]
+        # Iterate over all images in batch
+        bboxes = nonMaxSuppression(bboxes, iou_thresh=1, prob_threshold=0.99)
+
+
+        # nms_bboxes = list()
+        # for batch_img, _ in enumerate(bboxes):
             
-            bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
+        #     # bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
+        #     nms_bboxes += nonMaxSuppression(bboxes[batch_img], iou_thresh=1, prob_threshold=0.99)
+        #     print(len(nms_bboxes))
 
         return bboxes
 
@@ -97,11 +107,12 @@ class TargetTensor:
     # anchor should be in scaled_anchors form
     # RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
-    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor, threshold=False):
+    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor=None, threshold=False):
 
         batch, num_anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
 
         if fromPredictions:
+            assert anchor is not None, 'Anchors needed to convert to BBs from predictions!'
             tensor, _ = TargetTensor.convertPredsToBoundingBox(tensor, anchor)
             classes = torch.argmax(tensor[..., 5:], dim=-1).unsqueeze(-1)
         
@@ -125,7 +136,8 @@ class TargetTensor:
 
         else:
             bboxes = torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
-                batch, num_anchors * cells * cells, 6).tolist()
+                batch, num_anchors * cells * cells, 6
+            )
 
         return bboxes
 
