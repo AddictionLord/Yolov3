@@ -52,11 +52,13 @@ class TargetTensor:
     # Used to create instance from different data than original constructor,
     # scaled_anchors sould be confing.SCALED_ANCHORS
     @classmethod
-    def fromDataLoader(cls, scaled_anchors: torch.tensor, targets: list):
+    def fromDataLoader(cls, anchors: list, targets: list):
 
+        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
-        tt = cls(scaled_anchors.reshape(-1, 2), scales_cells)
-        tt.anchors, tt.tensor = scaled_anchors, targets
+        tt = cls(anchors, scales_cells)
+        tt.tensor = targets
+        # tt.anchors, tt.tensor = scaled_anchors, targets
 
         return tt
 
@@ -82,10 +84,7 @@ class TargetTensor:
     # Get BB from dataloader (no need to iterate over all scales)
     def getBoundingBoxesFromDataloader(self, scale):
 
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = TargetTensor.convertCellsToBoundingBoxes(
-            self.tensor[scale], False, self.anchors[scale]
-        )
+        bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
         for batch_img, _ in enumerate(bboxes):
             
             bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
@@ -99,11 +98,12 @@ class TargetTensor:
     # anchor should be in scaled_anchors form
     # RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
-    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor, threshold=False):
+    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor=None, threshold=False):
 
         batch, num_anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
 
         if fromPredictions:
+            assert anchor is not None, 'Anchors needed to convert to BBs from predictions!'
             tensor, _ = TargetTensor.convertPredsToBoundingBox(tensor, anchor)
             classes = torch.argmax(tensor[..., 5:], dim=-1).unsqueeze(-1)
         
@@ -124,6 +124,7 @@ class TargetTensor:
             for idx, batch_tensor in enumerate(b):
 
                 bboxes.append(batch_tensor[condition[idx]].reshape(-1, 6))
+                # bboxes.append(batch_tensor.reshape(-1, 6))
 
         else:
             bboxes = torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
@@ -133,7 +134,7 @@ class TargetTensor:
 
 
     # ------------------------------------------------------
-    # scaled_anchors.shape [3, 2] rquired, this is for only one scale
+    # scaled_anchors.shape [3, 2] required, this is for only one scale
     @staticmethod
     def convertPredsToBoundingBox(tensor: torch.tensor, anchors: torch.tensor):
 
