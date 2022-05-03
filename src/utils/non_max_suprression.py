@@ -21,7 +21,6 @@ https://www.youtube.com/watch?v=VAo84c1hQX8
 
 # ------------------------------------------------------
 # bbox format: [class, prob., x, y, w, h] or [[class, prob., x1, y1, x2, y2]]
-#  TODO: Check precision NMS, some differences was seen with A. Persson nms fcn
 def nonMaxSuppression(
     bboxes: list, 
     iou_thresh=0.5, 
