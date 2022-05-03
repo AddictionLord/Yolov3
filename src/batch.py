@@ -275,7 +275,7 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
     for batch_img_id, b_bboxes in enumerate(batch_bboxes):
 
         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
+        nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
         nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
 
         plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
