@@ -3,7 +3,8 @@ import torch
 
 sys.path.insert(1, '/home/mary/thesis/project/src/')
 from utils import intersectionOverUnion
-from torchvision.ops import nms
+from torchvision.ops import nms, box_convert
+
 
 
 
@@ -17,35 +18,66 @@ https://www.youtube.com/watch?v=VAo84c1hQX8
 '''
 
 
+# ------------------------------------------------------
+# Takes bboxes in shape: [batch, num_of_bboxes, 6] ->  6 -> [class, score, x, y, w, h]
+# Bboxes needs to be in midpoint format
+def nonMaxSuppression(bboxes: list, iou_thresh=0.5, prob_threshold=0.5) -> list:
+
+    filtered = filterScoresUnder(bboxes, prob_threshold)
+    for batch_img_id, b_bboxes in enumerate(filtered):
+
+        xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
+        nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
+        b_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
+
+    return filtered
 
 
 # ------------------------------------------------------
-# bbox format: [class, prob., x, y, w, h] or [[class, prob., x1, y1, x2, y2]]
-#  TODO: Check precision NMS, some differences was seen with A. Persson nms fcn
-def nonMaxSuppression(
-    bboxes: list, 
-    iou_thresh=0.5, 
-    prob_threshold=0.5, 
-    form='midpoint'
-    ) -> list:
+# This fcn filters all bounding boxes from whole batch with score lower than threshold
+# bboxes shape: [batch, num_of_bboxes, 6] ->  6 -> [class, score, x, y, w, h]
+def filterScoresUnder(bboxes, thresh=0.8):
 
-    # Filter all bboxes with probability under threshold score
-    bboxes = [box for box in bboxes if box[1] > prob_threshold]
-    # sort bboxes according to probability
-    bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
-    final = list()
-    while bboxes:
+    assert bboxes.shape[-1] == 6, 'Wrong bboxes format shape, [class, score, x, y, w, h] required'
+    batch = bboxes.shape[0]
+    condition = (bboxes[..., 1:2] >= thresh)
+    condition = condition.repeat(1, 1, 1, 1, 6).reshape(batch, -1, 6)
+    filtered = list()
+    for idx, batch_tensor in enumerate(bboxes):
 
-        # sort bboxes according to probability
-        # bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
-        fittest_bbox = bboxes.pop(0)
-        final.append(fittest_bbox)
-        for box in bboxes:
+        filtered.append(batch_tensor[condition[idx]].reshape(-1, 6))
 
-            iou = intersectionOverUnion(fittest_bbox, box, form).item()
-            bboxes.remove(box) if iou > iou_thresh else None
+    return filtered
 
-    return final
+
+
+# # ------------------------------------------------------
+# # bbox format: [class, prob., x, y, w, h] or [[class, prob., x1, y1, x2, y2]]
+# #  TODO: Check precision NMS, some differences was seen with A. Persson nms fcn
+# def nonMaxSuppression(
+#     bboxes: list, 
+#     iou_thresh=0.5, 
+#     prob_threshold=0.5, 
+#     form='midpoint'
+#     ) -> list:
+
+#     # Filter all bboxes with probability under threshold score
+#     bboxes = [box for box in bboxes if box[1] > prob_threshold]
+#     # sort bboxes according to probability
+#     bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+#     final = list()
+#     while bboxes:
+
+#         # sort bboxes according to probability
+#         # bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+#         fittest_bbox = bboxes.pop(0)
+#         final.append(fittest_bbox)
+#         for box in bboxes:
+
+#             iou = intersectionOverUnion(fittest_bbox, box, form).item()
+#             bboxes.remove(box) if iou > iou_thresh else None
+
+#     return final
 
 
 # ------------------------------------------------------
