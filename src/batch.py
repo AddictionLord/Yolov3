@@ -121,7 +121,32 @@ class YoloTrainer:
 
 
     # ------------------------------------------------------
-    def _train(self, model: Yolov3, optimizer: torch.optim, img, targets):
+    def _validate(self, model: Yolov3):
+
+        model.eval()
+        for batch_id, (img, targets) in enumerate(tqdm(self.val_loader)):
+
+            with torch.no_grad():
+                preds = model(img.to(device).to(torch.float32))
+
+            anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=device)
+            preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, config.PROBABILITY_THRESHOLD)
+            targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
+            target_bboxes = targets.getBoundingBoxesFromDataloader(1)
+
+            for preds, targets in zip(preds_bboxes, target_bboxes):
+
+                preds, targets = convertDataToMAP(preds, targets)
+                self.mAP.update(preds, targets)
+                from pprint import pprint
+                pprint(self.mAP.compute())
+
+        model.train()
+
+
+
+    # ------------------------------------------------------
+    def _train(self, model: Yolov3, optimizer: torch.optim, img=None, targets=None):
 
         losses = list()
         with torch.cuda.amp.autocast():
