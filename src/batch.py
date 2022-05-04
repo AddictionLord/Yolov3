@@ -272,8 +272,6 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
                 batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
 
-        # print(f'Predictions:\n{batch_bboxes}')
-
         model.train()
 
     for batch_img_id, b_bboxes in enumerate(batch_bboxes):

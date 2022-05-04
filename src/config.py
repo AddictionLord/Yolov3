@@ -23,8 +23,9 @@ LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
 LAMBDA_COORD = 10 #10
 LAMBDA_NOOBJ = 0.5 #10
-PROBABILITY_THRESHOLD = 0.8
-IOU_THRESHOLD = 0.5
+
+PROBABILITY_THRESHOLD = 0.5
+IOU_THRESHOLD = 0.4
 
 
 
@@ -57,7 +58,7 @@ ANCHORS = [
 SCALED_ANCHORS =  (
     torch.tensor(ANCHORS) * 
     torch.tensor(CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2)
-)
+).to(torch.device(DEVICE))
 
 
 # ------------------------------------------------------
@@ -267,9 +268,10 @@ if __name__ == '__main__':
     # print(LABELS_INDICES.index(17))
 
 
-    t = torch.tensor(ANCHORS, device=DEVICE)
+    # t = torch.tensor(ANCHORS, device=DEVICE)
 
-    t = torch.tensor(ANCHORS[0] + ANCHORS[1] + ANCHORS[2], dtype=torch.float64)
-    print(t)
+    # t = torch.tensor(ANCHORS[0] + ANCHORS[1] + ANCHORS[2], dtype=torch.float64)
+    # print(t)
 
+    print(torch.tensor(CELLS_PER_SCALE).view(-1, 1, 1).repeat(1, 3, 2))
 
