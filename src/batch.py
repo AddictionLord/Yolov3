@@ -286,9 +286,16 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
 
 # ------------------------------------------------------------
-def createPerfectPredictionTensor(loader):
+def createPerfectPredictionTensor(loader, anchors):
 
-    image, target = next(iter(loader))
+    def inv_sig(x):
+        return -torch.log((1 / x) - 1)
+
+
+    image, targets = next(iter(loader))
+    t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
+    target = t
+
     # plot_image(image[0].permute(1,2,0).detach().cpu())
 
     condition = (target[0][..., 0:1] == 1)
@@ -300,12 +307,12 @@ def createPerfectPredictionTensor(loader):
     values_idx = values_idx[..., 2:4].tolist()
 
     preds = target.copy()
-    preds[0] = torch.zeros(1, 3, 13, 13, 11)
-    preds[1] = torch.zeros(1, 3, 13, 13, 11)
-    preds[2] = torch.zeros(1, 3, 13, 13, 11)
-    preds[0][..., 0:3] = inv_sig(target[0][..., 0:3])
+    preds[0] = torch.zeros(1, 3, 13, 13, 11).to(device)
+    preds[1] = torch.zeros(1, 3, 13, 13, 11).to(device)
+    preds[2] = torch.zeros(1, 3, 13, 13, 11).to(device)
+    preds[0][..., 0:3] = inv_sig(target[0][..., 0:3]).to(device)
     # preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2))
-    preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2))
+    preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / anchors[0, ...].reshape(1, 3, 1, 1, 2)).to(device)
     # torch.log(1e-16 + target[..., 3:5] / anchors)
     preds[0][0, 0, 6, 7, 5] = 6
     preds[0][0, 0, 6, 8, 5] = 6
@@ -314,14 +321,18 @@ def createPerfectPredictionTensor(loader):
     back_target = target.copy()
     back_target[0][..., 0:3] = torch.sigmoid(preds[0][..., 0:3])
     # back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2)
-    back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2)
+    back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * anchors[0, ...].reshape(1, 3, 1, 1, 2)
     back_target[0][..., 5] = torch.argmax(preds[0][..., 5:], dim=-1)
 
     # print(torch.argmax(preds[0][..., 5:], dim=-1))
-    # print(target[0][0, 0, 6, 7, ...])
-    # print(back_target[0][0, 0, 6, 7, ...])
+    print(target[0][0, 0, 6, 7, ...])
+    print(target[0][0, 0, 6, 8, ...])
+    print(back_target[0][0, 0, 6, 7, ...])
+    print()
+    print(preds[0][0, 0, 6, 7, ...])
+    print(preds[0][0, 0, 6, 8, ...])
 
-    return preds
+    return preds, image
 
 
 
