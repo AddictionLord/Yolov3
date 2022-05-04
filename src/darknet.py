@@ -40,7 +40,7 @@ class Darknet(nn.Module, CNNBuilder):
     # ------------------------------------------------------
     # Iterates over all layers, saves tensors after ResidualBlock
     # with 8 repeats to concatenate tensor later (route connections)
-    @torch.no_grad()
+    # @torch.no_grad()
     def forward(self, x: torch.tensor):
 
         for layer in self.darknet:
