@@ -93,24 +93,22 @@ class Dataset(CocoDetection):
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
                     targets.setProbabilityToCell(cx, cy, -1)
 
-        return image, tuple(targets)
+        return image.to(torch.float16), tuple(targets.tensor)
 
 
 
 
 # ------------------------------------------------------
-# TODO: replace cells_to_bboxes, plot_image (thirdparty)
+# Loads couple of images and annotations from dataset
 def test(data_path, annots_path):
 
     d = Dataset(data_path, annots_path, anchors, transform=transform)
     train_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
 
-    scaled_anchors = config.SCALED_ANCHORS
-
     # targets has shape tuple([BATCH, A, S, S, 6], [..], [..]) - 3 scales
     for image, targets in train_loader:
 
-        target = TargetTensor.fromDataLoader(scaled_anchors, targets)
+        target = TargetTensor.fromDataLoader(config.ANCHORS, targets)
         bboxes = target.getBoundingBoxesFromDataloader(2)
 
         batch_size = image.shape[0]

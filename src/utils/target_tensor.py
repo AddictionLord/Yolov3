@@ -1,22 +1,22 @@
 import torch
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
-import config
+sys.path.insert(1, '/home/s200640/thesis/src/')
 from utils import nonMaxSuppression
+import config
 
 
 # Each scale has one tensor, shape of tensor is:
 # shape: [num_of_anchors, cells_x, cells_y, bounding_box/anchor_data]
 #        bounding_box/anchor_data format: [probability, x, y, w, h, classification]
+# anchors in torch.tensor, shape: [9], unscaled anchors
 class TargetTensor:
     def __init__(self, anchors: torch.Tensor, scales_cells: list):
 
-        self.anchors = anchors
         self.cells = scales_cells #number of cells in each scale
-
         self.num_of_anchors = anchors.shape[0]
         self.num_of_anchors_per_scale = self.num_of_anchors // len(self.cells)
+        self.anchors = anchors.reshape(-1, 3, 2)
 
         self.tensor = [torch.zeros((self.num_of_anchors // 3, S, S, 6)) for S in self.cells]
 
@@ -26,13 +26,13 @@ class TargetTensor:
     def computeLossWith(self, preds: list, loss_fcn):
 
         targets, d = self.tensor, torch.device(config.DEVICE)
-        TargetTensor.passTargetsToDevice(preds, d) if preds[0].device != d else None
-        TargetTensor.passTargetsToDevice(targets, d) if targets[0].device != d else None
+        TargetTensor.passTargetsToDevice(preds, d)
+        TargetTensor.passTargetsToDevice(targets, d)
 
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
-            # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
+            # print(self.anchors)
             loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
         return loss
@@ -41,7 +41,7 @@ class TargetTensor:
     # ------------------------------------------------------
     # Sets all tensors in target to specific device
     @staticmethod
-    def passTargetsToDevice(targets: list, device: str):
+    def passTargetsToDevice(targets: list, device: [str, torch.device]):
 
         for tensor in targets:
 
@@ -50,45 +50,45 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Used to create instance from different data than original constructor,
-    # scaled_anchors sould be confing.SCALED_ANCHORS
+    # anchors sould be config.ANCHORS
     @classmethod
-    def fromDataLoader(cls, scaled_anchors: torch.tensor, targets: list):
+    def fromDataLoader(cls, anchors: list, targets: list):
 
+        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
-        tt = cls(scaled_anchors.reshape(-1, 2), scales_cells)
-        tt.anchors, tt.tensor = scaled_anchors, targets
+        tt = cls(anchors, scales_cells)
+        tt.tensor = targets
 
         return tt
 
 
-    # ------------------------------------------------------
-    # Compute BBs from models predictions (iterating over all the scales)
-    def computeBoundingBoxesFromPreds(self):
+    # # ------------------------------------------------------
+    # # Compute BBs from models predictions (iterating over all the scales)
+    # def computeBoundingBoxesFromPreds(self):
 
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = list()
-        for scale in range(len(self.cells)):
+    #     num_of_anchors = self.num_of_anchors_per_scale
+    #     bboxes = list()
+    #     for scale in range(len(self.cells)):
 
-            bboxes += TargetTensor.convertCellsToBoundingBoxes(
-                self.tensor[scale], True, self.anchors[scale]
-            )[0]
+    #         bboxes += TargetTensor.convertCellsToBoundingBoxes(
+    #             self.tensor[scale], True, self.anchors[scale]
+    #         )[0]
 
-            bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
+    #         bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
 
-        return bboxes
+    #     return bboxes
 
 
     # ------------------------------------------------------
     # Get BB from dataloader (no need to iterate over all scales)
     def getBoundingBoxesFromDataloader(self, scale):
-
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = TargetTensor.convertCellsToBoundingBoxes(
-            self.tensor[scale], False, self.anchors[scale]
-        )
-        for batch_img, _ in enumerate(bboxes):
-            
-            bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
+        
+        # when .tolist() returns len(bboxes[0]) = 8112 means:
+        # [[(batch_img_1)[bb1], [bb2], [bb3], ...], [(batch_img_2)[bb1], [bb2], ..]]
+        # without returns tensor of size [batch, num_bboxes, 6]
+        # Iterate over all images in batch
+        bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
+        bboxes = nonMaxSuppression(bboxes, iou_thresh=1, prob_threshold=0.99)
 
         return bboxes
 
@@ -96,14 +96,15 @@ class TargetTensor:
     # ------------------------------------------------------
     # Takes one tensor for one scale and returns list of all BB
     # tensor: [BATCH, A, S, S, 6] -> 6: [score, x, y, w, h, classification]
-    # anchor should be in scaled_anchors form
+    # !!!anchor should be in scaled_anchors form
     # RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
-    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor, threshold=False):
+    def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor=None, threshold=False):
 
         batch, num_anchors, cells = tensor.shape[0], tensor.shape[1], tensor.shape[2]
 
         if fromPredictions:
+            assert anchor is not None, 'Anchors needed to convert to BBs from predictions!'
             tensor, _ = TargetTensor.convertPredsToBoundingBox(tensor, anchor)
             classes = torch.argmax(tensor[..., 5:], dim=-1).unsqueeze(-1)
         
@@ -114,7 +115,8 @@ class TargetTensor:
         cell_indices = torch.arange(cells).repeat(batch, 3, cells, 1).unsqueeze(-1).to(tensor.device)
         x = (cell_indices + tensor[..., 1:2]) * (1 / cells)
         y = (cell_indices.permute(0, 1, 3, 2, 4) + tensor[..., 2:3]) * (1 / cells)
-        wh = tensor[..., 3:5] / cells
+        wh = tensor[..., 3:5] / cells # This is for scaled anchors (no needed)
+        # wh = tensor[..., 3:5] # This for using non-scaled anchors
 
         if threshold:
             bboxes = list()
@@ -127,7 +129,8 @@ class TargetTensor:
 
         else:
             bboxes = torch.cat((classes, scores, x, y, wh), dim=-1).reshape(
-                batch, num_anchors * cells * cells, 6).tolist()
+                batch, num_anchors * cells * cells, 6
+            )
 
         return bboxes
 
@@ -162,7 +165,8 @@ class TargetTensor:
     # iou_idx is index of bbox from argsorted iou(bbox, anchor) scores
     def determineAnchorAndScale(self, iou_idx: int):
 
-        self.scale = iou_idx // self.num_of_anchors_per_scale 
+        # self.scale = iou_idx // self.num_of_anchors_per_scale 
+        self.scale = torch.div(iou_idx, self.num_of_anchors_per_scale, rounding_mode='floor')
         self.anchor = iou_idx % self.num_of_anchors_per_scale
 
         return self.scale, self.anchor
@@ -232,13 +236,15 @@ if __name__ == '__main__':
         
     # print(batch_bboxes)
 
-    from torchvision.ops import box_convert
-    xyxy = box_convert(torch.tensor([0.5, 0.5, 0.4, 0.4]), 'cxcywh', 'xyxy')
-    print(xyxy)
+    # from torchvision.ops import box_convert
+    # xyxy = box_convert(torch.tensor([0.5, 0.5, 0.4, 0.4]), 'cxcywh', 'xyxy')
+    # print(xyxy)
 
-    t = torch.zeros(4, 6)
-    t[..., 0] = torch.tensor([1, 2, 3, 4])
-    indices = torch.tensor([0, 2])
+    # t = torch.zeros(4, 6)
+    # t[..., 0] = torch.tensor([1, 2, 3, 4])
+    # indices = torch.tensor([0, 2])
 
-    s = torch.index_select(t, dim=0, index=indices)
-    print(s)
+    # s = torch.index_select(t, dim=0, index=indices)
+    # print(s)
+
+    pass
