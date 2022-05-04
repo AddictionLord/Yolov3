@@ -42,7 +42,6 @@ val_annots_path = r'dataset/instances_val2017.json'
 # train_imgs_path = r'dataset/train2017'
 # train_annots_path = r'dataset/instances_train2017.json'
 
-
 darknet53_path = 'models/pretrained/darknet53.conv.74'
 
 

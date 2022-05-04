@@ -35,7 +35,7 @@ def getLoaders():
         config.ANCHORS,
         config.CELLS_PER_SCALE,
         config.NUM_OF_CLASSES,
-        config.train_transforms,
+        config.test_transforms,
     )
     val_loader = DataLoader(
         val_dataset,

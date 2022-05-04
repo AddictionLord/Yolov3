@@ -109,13 +109,14 @@ class YoloTrainer:
             self.scaler.step(optimizer)
             self.scaler.update()
 
-            loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
+            loader.set_postfix(loss=loss.item(), mean_loss=torch.mean(torch.tensor(losses)).item())
 
 
     # ------------------------------------------------------
     @staticmethod
     def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
 
+        print(f"[YOLO TRAINER]: Saving model to {path}")
         container = {
             "state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -130,7 +131,7 @@ class YoloTrainer:
     @staticmethod
     def loadModel(path: str="./models/test_model.pth.tar"):
 
-        print(f"[YOLO TRAINER]: Loading model container {path}")
+        print(f"[YOLO TRAINER]: Loading model container: {path}")
 
         return torch.load(path, map_location=config.DEVICE)
 
@@ -139,7 +140,7 @@ class YoloTrainer:
     @staticmethod
     def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
 
-        print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
+        print("[YOLO TRAINER]: Uploading parameters to model and optimizer")
         model.load_state_dict(params['state_dict'])
         optimizer.load_state_dict(params['optimizer'])
 
@@ -372,7 +373,6 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        saved = t.model.parameters()
         YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
 
 
