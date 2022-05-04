@@ -61,7 +61,7 @@ class YoloTrainer:
         if load:
             YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
 
-        w = self.model.yolo[0].block[0].weight.data.clone()
+        # w = self.model.yolo[0].block[0].weight.data.clone()
         # img, targets = next(iter(self.val_loader))
 
         anchors = config.ANCHORS
@@ -72,21 +72,23 @@ class YoloTrainer:
         d = Dataset(val_img, val_annots, anchors, transform=transform)
         img, targets = d[0]
         targets = list(targets)
-        print(type(targets))
+        # print(type(targets))
         for i in range(len(targets)):
             targets[i] = torch.unsqueeze(targets[i], 0)
         img = img.unsqueeze(0)
-        print(targets[0].shape)
+        # print(targets[0].shape)
 
         img = img.to(config.DEVICE)
         t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
         targets = TargetTensor.fromDataLoader(self.anchors, t)
         TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
-        for epoch in range(config.NUM_OF_EPOCHS):
-
+        # for epoch in range(config.NUM_OF_EPOCHS):
+        epoch = 0
+        while True:
+            epoch += 1
             self._train(self.model, self.optimizer, img.detach().clone(), targets)
-            if epoch != 0 and epoch % 10000 == 0:
-                print(f'{epoch}/{config.NUM_OF_EPOCHS}')
+            if epoch != 0 and epoch % 500 == 0:
+                # print(f'{epoch}/{config.NUM_OF_EPOCHS}')
                 # self.model.eval()
                 # TODO: Implement evaluating fcns
                 # checkClassAccuracy()
