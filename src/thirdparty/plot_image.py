@@ -79,7 +79,7 @@ if __name__ == '__main__':
     val_annots = config.val_annots_path
 
     d = Dataset(val_img, val_annots, anchors, transform=transform)
-    img, targets = d[21]
+    img, targets = d[30]
     print(len(targets))
     print(targets[0].unsqueeze(0).shape)
     plot_image(img.permute(1, 2, 0).to('cpu'))

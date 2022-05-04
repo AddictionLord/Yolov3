@@ -1,3 +1,8 @@
+import sys
+sys.path.insert(1, '/home/s200640/thesis/src/')
+
+import config
+
 from .weights_handler import WeightsHandler
 from .bounding_box import BoundingBox
 from .intersection_over_union import iouBetweenBboxAnchor
