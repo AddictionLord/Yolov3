@@ -1,5 +1,6 @@
 import torch
 from torch.optim import Adam, SGD
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import warnings
 from tqdm import tqdm
@@ -304,10 +305,48 @@ def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/ba
     return model, img
 
 
+# # ------------------------------------------------------
+# def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
+
+#     from torchvision.ops import nms, box_convert
+
+#     if isinstance(loader, torch.utils.data.DataLoader):
+#         img, targets = next(iter(loader))
+
+#     else:
+#         img = loader
+
+#     model.eval()
+#     with torch.no_grad():
+
+#         if preds is None:
+#             preds = model(img.to(config.DEVICE))
+
+#         batch_bboxes = [torch.tensor([], device=device) for _ in range(img.shape[0])]
+#         for scale, pred_on_scale in enumerate(preds):
+
+#             boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
+#                 pred_on_scale, True, anchors[scale], thresh
+#             )
+#             for batch_img_id, (box) in enumerate(boxes_on_scale):
+
+#                 batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
+
+#         model.train()
+
+#     for batch_img_id, b_bboxes in enumerate(batch_bboxes):
+
+#         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
+#         print(xyxy.shape)
+#         nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
+#         nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
+
+#         print(nms_bboxes)
+#         plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes.cpu())
+
+
 # ------------------------------------------------------
 def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
-
-    from torchvision.ops import nms, box_convert
 
     if isinstance(loader, torch.utils.data.DataLoader):
         img, targets = next(iter(loader))
@@ -316,33 +355,18 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
         img = loader
 
     model.eval()
-    img = img.to(config.DEVICE)
     with torch.no_grad():
 
         if preds is None:
-            preds = model(img)
-
-        batch_bboxes = [torch.tensor([], device=device) for _ in range(img.shape[0])]
-        for scale, pred_on_scale in enumerate(preds):
-
-            boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
-                pred_on_scale, True, anchors[scale], thresh
-            )
-            for batch_img_id, (box) in enumerate(boxes_on_scale):
-
-                batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
+            preds = model(img.to(config.DEVICE))
 
         model.train()
 
-    for batch_img_id, b_bboxes in enumerate(batch_bboxes):
+    pred_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, thresh)
+    for batch_img_id, boxes in enumerate(pred_bboxes):
 
-        xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        print(xyxy.shape)
-        nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
-        nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
+        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), boxes.detach().cpu())
 
-        print(nms_bboxes)
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes.cpu())
 
 
 # ------------------------------------------------------------
@@ -404,7 +428,7 @@ if __name__ == '__main__':
     from yolo import Yolov3
     from dataset import Dataset
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
-    from utils import getValLoader
+    from utils import getValLoader, nonMaxSuppression
 
     device = torch.device(DEVICE)
     transform = config.test_transforms
@@ -426,12 +450,12 @@ if __name__ == '__main__':
     # val_loader = getValLoader()
 
     # d = Dataset(val_img, val_annots, anchors, transform=transform)
-    # val_loader, targets = d[30]
+    # val_loader, targets = d[0]
     # val_loader = val_loader.unsqueeze(0) 
     # # print(len(targets))
     # # print(targets[0].unsqueeze(0).shape)
 
-    # container = YoloTrainer.loadModel('./models/gpu_30.pth.tar')
+    # container = YoloTrainer.loadModel('./models/gpu_home.pth.tar')
     # model = Yolov3(config.yolo_config)
     # model.load_state_dict(container['state_dict'])
     # model = model.to(torch.float16)
@@ -457,23 +481,33 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     # FOR TRAINING YOLO
     # ------------------------------------------------------------
+    # t = YoloTrainer()
+    # container = {'architecture': config.yolo_config}
+    # container = YoloTrainer.loadModel('./models/gpu_anchors_overnight_12.pth.tar')
+
+    # try:
+    #     t.trainYoloNet(container, load=True)
+    #     # t.trainYoloNet(container)
+
+    # except KeyboardInterrupt as e:
+    #     print('[YOLO TRAINER]: KeyboardInterrupt', e)
+
+    # except Exception as e:
+    #     print(e)
+
+    # finally:
+    #     YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_30.pth.tar")
+    #     pass
+
+
+
+
+
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('./models/gpu_anchors_overnight_12.pth.tar')
+    container = YoloTrainer.loadModel('./models/gpu_home.pth.tar')
 
-    try:
-        t.trainYoloNet(container, load=True)
-        # t.trainYoloNet(container)
-
-    except KeyboardInterrupt as e:
-        print('[YOLO TRAINER]: KeyboardInterrupt', e)
-
-    except Exception as e:
-        print(e)
-
-    finally:
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_30.pth.tar")
-    
+    t.trainYoloNet(container, load=True)
 
 
 
