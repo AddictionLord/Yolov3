@@ -68,3 +68,20 @@ def plot_image(image, boxes=None):
 
 
 
+
+if __name__ == '__main__':
+
+    from dataset import Dataset
+
+    anchors = config.ANCHORS
+    transform = config.test_transforms
+    val_img = config.val_imgs_path
+    val_annots = config.val_annots_path
+
+    d = Dataset(val_img, val_annots, anchors, transform=transform)
+    img, targets = d[21]
+    print(len(targets))
+    print(targets[0].unsqueeze(0).shape)
+    plot_image(img.permute(1, 2, 0).to('cpu'))
+
+
