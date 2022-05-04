@@ -56,27 +56,40 @@ class YoloTrainer:
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
         self.model = Yolov3(net['architecture'])
         self.model = self.model.to(config.DEVICE)
-        self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+        self.optimizer = Adam(
+            self.model.parameters(), 
+            config.LEARNING_RATE, 
+            weight_decay=config.WEIGHT_DECAY
+        )
+        self.scheduler = ReduceLROnPlateau(
+            self.optimizer, 
+            factor=0.5, 
+            patience=30, 
+            min_lr=1e-10, 
+            verbose=True, 
+            threshold=1e-4,
+            cooldown=10
+        )
         self.mAP = MeanAveragePrecision()
         if load:
-            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
+            YoloTrainer.uploadParamsToModel(self.model, net, self.optimizer, self.scheduler)
 
-        # w = self.model.yolo[0].block[0].weight.data.clone()
+        # -----------------------------
         # img, targets = next(iter(self.val_loader))
-
         anchors = config.ANCHORS
         transform = config.test_transforms
         val_img = config.val_imgs_path
         val_annots = config.val_annots_path
 
         d = Dataset(val_img, val_annots, anchors, transform=transform)
-        img, targets = d[0]
+        img, targets = d[30]
         targets = list(targets)
         # print(type(targets))
         for i in range(len(targets)):
             targets[i] = torch.unsqueeze(targets[i], 0)
         img = img.unsqueeze(0)
         # print(targets[0].shape)
+        # -----------------------------
 
         img = img.to(config.DEVICE)
         t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
@@ -86,8 +99,12 @@ class YoloTrainer:
         epoch = 0
         while True:
             epoch += 1
-            self._train(self.model, self.optimizer, img.detach().clone(), targets)
-            if epoch != 0 and epoch % 500 == 0:
+            loss = self._train(self.model, self.optimizer, img.detach().clone(), targets)
+            self.scheduler.step(loss)
+            print(f'{epoch}')
+            
+            if epoch != 0 and epoch % 100 == 0:
+                pass
                 # print(f'{epoch}/{config.NUM_OF_EPOCHS}')
                 # self.model.eval()
                 # TODO: Implement evaluating fcns
@@ -99,11 +116,6 @@ class YoloTrainer:
                 # preds, target = convertDataToMAP(preds_bboxes, target_bboxes)
                 # self.mAP.update(preds, target)
                 # self.model.train()
-                for g in self.optimizer.param_groups:
-                     g['lr'] = config.LEARNING_RATE / 2
-                     print(f'learning rate modified: {g["lr"]}')
-
-        # print(w == self.model.yolo[0].block[0].weight.data)
 
         return self.model, self.optimizer
 
@@ -129,17 +141,25 @@ class YoloTrainer:
         self.scaler.step(optimizer)
         self.scaler.update()
 
+        return loss.item()
+
 
 
 
     # ------------------------------------------------------
     @staticmethod
-    def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
+    def saveModel(
+        model: Yolov3, 
+        optimizer: torch.optim, 
+        path: str="./models/test_model.pth.tar",
+        scheduler:torch.optim.lr_scheduler.StepLR=None   
+    ):
 
         container = {
             "state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "architecture": model.config,
+            "scheduler": scheduler,
         }
 
         torch.save(container, path)
@@ -157,12 +177,20 @@ class YoloTrainer:
 
     # ------------------------------------------------------
     @staticmethod
-    def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
+    def uploadParamsToModel(
+        model: Yolov3, 
+        params: dict, 
+        optimizer: torch.optim=None, 
+        scheduler:torch.optim.lr_scheduler.StepLR=None
+    ):
 
         print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
         model.load_state_dict(params['state_dict'])
-        optimizer.load_state_dict(params['optimizer'])
+        if optimizer and 'scheduler' in params.keys():
+            optimizer.load_state_dict(params['optimizer'])
 
+        if scheduler and 'scheduler' in params.keys():
+            scheduler.load_state_dict(params['scheduler'])
 
 
 
@@ -365,19 +393,19 @@ if __name__ == '__main__':
 
     # val_loader = getValLoader()
 
-    d = Dataset(val_img, val_annots, anchors, transform=transform)
-    val_loader, targets = d[21]
-    val_loader = val_loader.unsqueeze(0) 
-    # print(len(targets))
-    # print(targets[0].unsqueeze(0).shape)
+    # d = Dataset(val_img, val_annots, anchors, transform=transform)
+    # val_loader, targets = d[30]
+    # val_loader = val_loader.unsqueeze(0) 
+    # # print(len(targets))
+    # # print(targets[0].unsqueeze(0).shape)
 
-    container = YoloTrainer.loadModel('./models/gpu_21.pth.tar')
-    model = Yolov3(config.yolo_config)
-    model.load_state_dict(container['state_dict'])
-    model = model.to(torch.float16)
-    model = model.to(device)
+    # container = YoloTrainer.loadModel('./models/gpu_30.pth.tar')
+    # model = Yolov3(config.yolo_config)
+    # model.load_state_dict(container['state_dict'])
+    # model = model.to(torch.float16)
+    # model = model.to(device)
 
-    plotDetections(model, val_loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, anchors)
+    # plotDetections(model, val_loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, anchors)
 
 
     # ------------------------------------------------------------
@@ -397,22 +425,22 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     # FOR TRAINING YOLO
     # ------------------------------------------------------------
-    # t = YoloTrainer()
-    # container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('./models/gpu_anchors_overnight_12.pth.tar')
+    t = YoloTrainer()
+    container = {'architecture': config.yolo_config}
+    container = YoloTrainer.loadModel('./models/gpu_anchors_overnight_12.pth.tar')
 
-    # try:
-    #     t.trainYoloNet(container, load=True)
-    #     # t.trainYoloNet(container)
+    try:
+        t.trainYoloNet(container, load=True)
+        # t.trainYoloNet(container)
 
-    # except KeyboardInterrupt as e:
-    #     print('[YOLO TRAINER]: KeyboardInterrupt', e)
+    except KeyboardInterrupt as e:
+        print('[YOLO TRAINER]: KeyboardInterrupt', e)
 
-    # except Exception as e:
-    #     print(e)
+    except Exception as e:
+        print(e)
 
-    # finally:
-    #     YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_21.pth.tar")
+    finally:
+        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_30.pth.tar")
     
 
 
