@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image, ImageFile
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
+sys.path.insert(1, '/home/s200640/thesis/src/')
 import config
 
 '''
