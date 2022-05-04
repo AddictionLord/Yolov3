@@ -1,5 +1,6 @@
 import torch
 from torch.optim import Adam, SGD
+from torch.optim.lr_scheduler import StepLR
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import warnings
 from tqdm import tqdm
