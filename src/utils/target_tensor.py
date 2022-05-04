@@ -104,7 +104,7 @@ class TargetTensor:
     # ------------------------------------------------------
     # Takes one tensor for one scale and returns list of all BB
     # tensor: [BATCH, A, S, S, 6] -> 6: [score, x, y, w, h, classification]
-    # anchor should be in scaled_anchors form
+    # !!!anchor should be in scaled_anchors form
     # RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
     def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor=None, threshold=False):
@@ -123,7 +123,8 @@ class TargetTensor:
         cell_indices = torch.arange(cells).repeat(batch, 3, cells, 1).unsqueeze(-1).to(tensor.device)
         x = (cell_indices + tensor[..., 1:2]) * (1 / cells)
         y = (cell_indices.permute(0, 1, 3, 2, 4) + tensor[..., 2:3]) * (1 / cells)
-        wh = tensor[..., 3:5] / cells
+        wh = tensor[..., 3:5] / cells # This is for scaled anchors (no needed)
+        # wh = tensor[..., 3:5] # This for using non-scaled anchors
 
         if threshold:
             bboxes = list()
