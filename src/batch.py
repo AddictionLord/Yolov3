@@ -70,37 +70,44 @@ class YoloTrainer:
             threshold=1e-4,
             cooldown=10
         )
-        self.mAP = MeanAveragePrecision()
+        self.mAP = MeanAveragePrecision(
+            box_format='cxcywh',
+        )
         if load:
             YoloTrainer.uploadParamsToModel(self.model, net, self.optimizer, self.scheduler)
 
-        # -----------------------------
-        # img, targets = next(iter(self.val_loader))
-        anchors = config.ANCHORS
-        transform = config.test_transforms
-        val_img = config.val_imgs_path
-        val_annots = config.val_annots_path
+        # # -----------------------------
+        # # img, targets = next(iter(self.val_loader))
+        # anchors = config.ANCHORS
+        # transform = config.test_transforms
+        # val_img = config.val_imgs_path
+        # val_annots = config.val_annots_path
 
-        d = Dataset(val_img, val_annots, anchors, transform=transform)
-        img, targets = d[30]
-        targets = list(targets)
-        # print(type(targets))
-        for i in range(len(targets)):
-            targets[i] = torch.unsqueeze(targets[i], 0)
-        img = img.unsqueeze(0)
-        # print(targets[0].shape)
-        # -----------------------------
+        # d = Dataset(val_img, val_annots, anchors, transform=transform)
+        # img, targets = d[30]
+        # targets = list(targets)
+        # # print(type(targets))
+        # for i in range(len(targets)):
+        #     targets[i] = torch.unsqueeze(targets[i], 0)
+        # img = img.unsqueeze(0)
+        # # print(targets[0].shape)
 
-        img = img.to(config.DEVICE)
-        t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-        targets = TargetTensor.fromDataLoader(self.anchors, t)
-        TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
+        # img = img.to(config.DEVICE)
+        # t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
+        # targets = TargetTensor.fromDataLoader(self.anchors, t)
+        # TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
+        # # -----------------------------
+
         # for epoch in range(config.NUM_OF_EPOCHS):
         epoch = 0
         while True:
+
             epoch += 1
-            loss = self._train(self.model, self.optimizer, img.detach().clone(), targets)
+            # loss = self._train(self.model, self.optimizer, img.detach().clone(), targets)
+            # loss = self._train(self.model, self.optimizer)
+            val_loss = self._validate(self.model)
             self.scheduler.step(loss)
+
             print(f'{epoch}')
             
             if epoch != 0 and epoch % 100 == 0:
