@@ -262,7 +262,7 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
         if preds is None:
             preds = model(img)
 
-        batch_bboxes = [torch.tensor([]) for _ in range(img.shape[0])]
+        batch_bboxes = [torch.tensor([], device=device) for _ in range(img.shape[0])]
         for scale, pred_on_scale in enumerate(preds):
 
             boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
@@ -277,10 +277,12 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
     for batch_img_id, b_bboxes in enumerate(batch_bboxes):
 
         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
+        print(xyxy.shape)
+        nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
         nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
 
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
+        print(nms_bboxes)
+        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes.cpu())
 
 
 # ------------------------------------------------------------
