@@ -272,6 +272,8 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
                 batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
 
+        # print(f'Predictions:\n{batch_bboxes}')
+
         model.train()
 
     for batch_img_id, b_bboxes in enumerate(batch_bboxes):
@@ -344,6 +346,7 @@ if __name__ == '__main__':
     from yolo import Yolov3
     from dataset import Dataset
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
+    from utils import getValLoader
 
     device = torch.device(DEVICE)
     transform = config.test_transforms
@@ -352,111 +355,73 @@ if __name__ == '__main__':
     train_img = config.train_imgs_path
     train_annots = config.train_annots_path
     scaled_anchors = config.SCALED_ANCHORS
-    batch_size = 4
+    anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=device)
 
-    def inv_sig(x):
-        return -torch.log((1 / x) - 1)
+    batch_size = 1
 
-    # val_dataset = Dataset(
-    #     config.val_imgs_path,
-    #     config.val_annots_path,
-    #     config.ANCHORS,
-    #     config.CELLS_PER_SCALE,
-    #     config.NUM_OF_CLASSES,
-    #     transform=transform
-    #     # config.test_transforms,
-    # )
-    # img = torch.utils.data.DataLoader(
-    #     val_dataset,
-    #     batch_size=batch_size,
-    #     num_workers=config.NUM_WORKERS,
-    #     pin_memory=config.PIN_MEMORY,
-    #     shuffle=False,
-    #     drop_last=False,
-    # )
 
-    # model, img = overfitSingleBatch(batch_size, 50, path='Nbatch_overfit1000.pth.tar', load='./models/gpu_darknet.pth.tar')
 
-    # plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
+    # ------------------------------------------------------------
+    # Test of trained model
+    # ------------------------------------------------------------
+
+    # val_loader = getValLoader()
+
+    d = Dataset(val_img, val_annots, anchors, transform=transform)
+    val_loader, targets = d[21]
+    val_loader = val_loader.unsqueeze(0) 
+    # print(len(targets))
+    # print(targets[0].unsqueeze(0).shape)
+
+    container = YoloTrainer.loadModel('./models/gpu_21.pth.tar')
+    model = Yolov3(config.yolo_config)
+    model.load_state_dict(container['state_dict'])
+    model = model.to(torch.float16)
+    model = model.to(device)
+
+    plotDetections(model, val_loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, anchors)
 
 
     # ------------------------------------------------------------
     # Test of plotting fcns and bbox calculations 
+    # ------------------------------------------------------------
 
-    # preds = createPerfectPredictionTensor(loader)
-    # plotDetections(model, image, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS, preds)
+    # container = YoloTrainer.loadModel('./models/gpu_test_loss3.pth.tar')
+    # model = Yolov3(config.yolo_config)
+    # model.load_state_dict(container['state_dict'])
+    # val_loader = getValLoader()
+
+    # preds, image = createPerfectPredictionTensor(val_loader, anchors)
+    # plotDetections(model, image.to(device), config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, anchors, preds)
 
 
 
     # ------------------------------------------------------------
-    t = YoloTrainer()
-    container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('./models/gpu_balanced.pth.tar')
+    # FOR TRAINING YOLO
+    # ------------------------------------------------------------
+    # t = YoloTrainer()
+    # container = {'architecture': config.yolo_config}
+    # container = YoloTrainer.loadModel('./models/gpu_anchors_overnight_12.pth.tar')
 
-    try:
-        # t.trainYoloNet(container, load=True)
-        t.trainYoloNet(container)
+    # try:
+    #     t.trainYoloNet(container, load=True)
+    #     # t.trainYoloNet(container)
 
-    except KeyboardInterrupt as e:
-        print('[YOLO TRAINER]: KeyboardInterrupt', e)
+    # except KeyboardInterrupt as e:
+    #     print('[YOLO TRAINER]: KeyboardInterrupt', e)
 
-    except Exception as e:
-        print(e)
+    # except Exception as e:
+    #     print(e)
 
-    finally:
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_test_loss3.pth.tar")
-
-
-
-
-
-
-
-
-
-
-
-    # -----------------------------------------------------
-    # params = YoloTrainer.loadModel("./models/test_model.pth.tar")
-
-    # model = Yolov3(params['architecture'])
-    # optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-
-    # YoloTrainer.uploadParamsToModel(model, optimizer, params)
-    # loaded = model.parameters()
-
-    # for parama, paramb in zip(saved, loaded):
-
-    #     a = parama
-    #     b = paramb
-
-    #     if torch.rand(1).item() > 0.7:
-    #         break
-
-    # print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
-        
+    # finally:
+    #     YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu_21.pth.tar")
     
 
 
 
 
-    # model = Yolov3(config.yolo_config)
-    # container = YoloTrainer.loadModel('models/gpu_mse_loss.pth.tar')
-    # model.load_state_dict(container['state_dict'])
 
-    # d = Dataset(val_img, val_annots, anchors, transform=transform)
-    # # val_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
-    # val_loader = torch.utils.data.DataLoader(d, batch_size=config.BATCH_SIZE, shuffle=False)
-
-    # # plotDetections(model, val_loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
-
-    # # img, targets = next(iter(val_loader))
-    # # plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
-
-
-
-    
-
+    # model, img = overfitSingleBatch(batch_size, 50, path='Nbatch_overfit1000.pth.tar', load='./models/gpu_darknet.pth.tar')
 
 
 
