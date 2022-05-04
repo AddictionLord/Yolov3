@@ -11,6 +11,8 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 
 # ------------------------------------------------------
+# DEBUG = True
+DEBUG = False
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
@@ -18,14 +20,19 @@ BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
-NUM_OF_EPOCHS = 15000
-LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
 LAMBDA_COORD = 10 #10
 LAMBDA_NOOBJ = 0.5 #10
 
-PROBABILITY_THRESHOLD = 0.5
-IOU_THRESHOLD = 0.4
+# Training + scheduling
+NUM_OF_EPOCHS = 15000
+STEP_SIZE = 500 # Num of epochs after which lr will decay
+LEARNING_RATE = 1e-3
+LR_DECAY = 10
+
+# Thresholds
+PROBABILITY_THRESHOLD = 0.997
+IOU_THRESHOLD = 0.2
 
 
 
