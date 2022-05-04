@@ -1,14 +1,15 @@
 import torch
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
-import config
+sys.path.insert(1, '/home/s200640/thesis/src/')
 from utils import nonMaxSuppression
+import config
 
 
 # Each scale has one tensor, shape of tensor is:
 # shape: [num_of_anchors, cells_x, cells_y, bounding_box/anchor_data]
 #        bounding_box/anchor_data format: [probability, x, y, w, h, classification]
+# anchors in torch.tensor, shape: [9], unscaled anchors
 class TargetTensor:
     def __init__(self, anchors: torch.Tensor, scales_cells: list):
 
@@ -31,7 +32,6 @@ class TargetTensor:
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
-            # print(f'Pred tensor:\n{pred.shape}\n, Target tensor:\n{target.shape}\n, Anchors tensor:\n{self.anchors[scale, ...].shape}\n')
             # print(self.anchors)
             loss += loss_fcn(pred, target, self.anchors[scale, ...])
 
@@ -41,7 +41,7 @@ class TargetTensor:
     # ------------------------------------------------------
     # Sets all tensors in target to specific device
     @staticmethod
-    def passTargetsToDevice(targets: list, device: str):
+    def passTargetsToDevice(targets: list, device: [str, torch.device]):
 
         for tensor in targets:
 
@@ -50,9 +50,9 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Used to create instance from different data than original constructor,
-    # anchors sould be torch.tensor(config.ANCHORS)
+    # anchors sould be config.ANCHORS
     @classmethod
-    def fromDataLoader(cls, anchors: torch.tensor, targets: list):
+    def fromDataLoader(cls, anchors: list, targets: list):
 
         anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
@@ -62,41 +62,33 @@ class TargetTensor:
         return tt
 
 
-    # ------------------------------------------------------
-    # Compute BBs from models predictions (iterating over all the scales)
-    def computeBoundingBoxesFromPreds(self):
+    # # ------------------------------------------------------
+    # # Compute BBs from models predictions (iterating over all the scales)
+    # def computeBoundingBoxesFromPreds(self):
 
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = list()
-        for scale in range(len(self.cells)):
+    #     num_of_anchors = self.num_of_anchors_per_scale
+    #     bboxes = list()
+    #     for scale in range(len(self.cells)):
 
-            bboxes += TargetTensor.convertCellsToBoundingBoxes(
-                self.tensor[scale], True, self.anchors[scale]
-            )[0]
+    #         bboxes += TargetTensor.convertCellsToBoundingBoxes(
+    #             self.tensor[scale], True, self.anchors[scale]
+    #         )[0]
 
-            bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
+    #         bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
 
-        return bboxes
+    #     return bboxes
 
 
     # ------------------------------------------------------
     # Get BB from dataloader (no need to iterate over all scales)
     def getBoundingBoxesFromDataloader(self, scale):
-
-        bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
+        
         # when .tolist() returns len(bboxes[0]) = 8112 means:
         # [[(batch_img_1)[bb1], [bb2], [bb3], ...], [(batch_img_2)[bb1], [bb2], ..]]
         # without returns tensor of size [batch, num_bboxes, 6]
         # Iterate over all images in batch
+        bboxes = TargetTensor.convertCellsToBoundingBoxes(self.tensor[scale], False)
         bboxes = nonMaxSuppression(bboxes, iou_thresh=1, prob_threshold=0.99)
-
-
-        # nms_bboxes = list()
-        # for batch_img, _ in enumerate(bboxes):
-            
-        #     # bboxes[batch_img] = nonMaxSuppression(bboxes[batch_img], 1, 0.99)
-        #     nms_bboxes += nonMaxSuppression(bboxes[batch_img], iou_thresh=1, prob_threshold=0.99)
-        #     print(len(nms_bboxes))
 
         return bboxes
 
@@ -244,13 +236,15 @@ if __name__ == '__main__':
         
     # print(batch_bboxes)
 
-    from torchvision.ops import box_convert
-    xyxy = box_convert(torch.tensor([0.5, 0.5, 0.4, 0.4]), 'cxcywh', 'xyxy')
-    print(xyxy)
+    # from torchvision.ops import box_convert
+    # xyxy = box_convert(torch.tensor([0.5, 0.5, 0.4, 0.4]), 'cxcywh', 'xyxy')
+    # print(xyxy)
 
-    t = torch.zeros(4, 6)
-    t[..., 0] = torch.tensor([1, 2, 3, 4])
-    indices = torch.tensor([0, 2])
+    # t = torch.zeros(4, 6)
+    # t[..., 0] = torch.tensor([1, 2, 3, 4])
+    # indices = torch.tensor([0, 2])
 
-    s = torch.index_select(t, dim=0, index=indices)
-    print(s)
+    # s = torch.index_select(t, dim=0, index=indices)
+    # print(s)
+
+    pass
