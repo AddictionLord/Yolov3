@@ -137,13 +137,18 @@ class YoloTrainer:
 
     # ------------------------------------------------------
     @staticmethod
-    def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
+    def saveModel(
+        model: Yolov3, 
+        optimizer: torch.optim, 
+        path: str="./models/test_model.pth.tar",
+        scheduler:torch.optim.lr_scheduler=None   
+    ):
 
-        print(f"[YOLO TRAINER]: Saving model to {path}")
         container = {
-            "state_dict": model.state_dict(),
+            "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "architecture": model.config,
+            "scheduler": scheduler,
         }
 
         torch.save(container, path)
@@ -154,98 +159,27 @@ class YoloTrainer:
     @staticmethod
     def loadModel(path: str="./models/test_model.pth.tar"):
 
-        print(f"[YOLO TRAINER]: Loading model container: {path}")
+        print(f"[YOLO TRAINER]: Loading model container {path}")
 
         return torch.load(path, map_location=config.DEVICE)
 
 
     # ------------------------------------------------------
     @staticmethod
-    def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
+    def uploadParamsToModel(
+        model: Yolov3, 
+        params: dict, 
+        optimizer: torch.optim=None, 
+        scheduler:torch.optim.lr_scheduler.StepLR=None
+    ):
 
-        print("[YOLO TRAINER]: Uploading parameters to model and optimizer")
-        model.load_state_dict(params['state_dict'])
-        optimizer.load_state_dict(params['optimizer'])
+        print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
+        model.load_state_dict(params['model'])
+        if optimizer and 'optimizer' in params.keys():
+            optimizer.load_state_dict(params['optimizer'])
 
-
-
-
-# ------------------------------------------------------
-def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/batch_overfit1000.pth.tar', load='./models/Nbatch_overfit1000.pth.tar'):
-
-    from torch.utils.data.dataloader import DataLoader
-
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        config.test_transforms,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-    global pred
-    pred = torch.zeros([1, 3, 13, 13, 11], dtype=torch.float16, device=config.DEVICE)
-
-    print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
-    model = Yolov3(config.yolo_config)
-    model = model.to(config.DEVICE)
-    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-    # optimizer = SGD(model.parameters(), config.LEARNING_RATE, momentum=0.01)
-
-    container = YoloTrainer.loadModel(load)
-    YoloTrainer.uploadParamsToModel(model, optimizer, container)
-    loss_fcn = Loss()
-    scaler = torch.cuda.amp.GradScaler() 
-
-    img, targets = next(iter(val_loader))
-    # t = [torch.tensor(target, device=config.DEVICE) for target in targets]
-    t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-    targets = TargetTensor.fromDataLoader(config.SCALED_ANCHORS.to(config.DEVICE), t)
-    img = img.to(torch.float16)
-    img = img.to(config.DEVICE)
-
-    print(targets[0].device)
-    print(img.device)
-    # losses = list()
-    model.train()
-    w = model.yolo[0].block[0].weight.data.clone()
-    print(f'Yolo weights req. grad: {model.yolo[0].block[0].weight.requires_grad}')
-    print(f'Darknet weights req. grad: {model.darknet.darknet[0].block[0].weight.requires_grad}')
-    for epoch in range(epochs):
-
-        print(f'epoch {epoch}/{epochs}')
-        with torch.autograd.detect_anomaly():
-            with torch.cuda.amp.autocast():
-                output = model(img)
-                print(f'Tensors are same: {torch.allclose(output[0], pred)}')
-                pred = output[0]
-                loss = targets.computeLossWith(output, loss_fcn)
-
-            # losses.append(loss.item())
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            optimizer.zero_grad()
-
-        print(f'actual loss: {loss.item()}')
-        # print(f'actual loss: {loss}, mean loss: {torch.mean(torch.tensor(losses)).item()}')
-
-    print(w == model.yolo[0].block[0].weight.data)
-    print(f'Do you want to save the model to: {path} [y/n]?')
-    if input() == 'y':
-        YoloTrainer.saveModel(model, optimizer, path)
-
-    return model, img
+        if scheduler and 'scheduler' in params.keys():
+            scheduler.load_state_dict(params['scheduler'])
 
 
 # ------------------------------------------------------
