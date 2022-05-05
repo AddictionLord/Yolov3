@@ -114,17 +114,12 @@ class YoloTrainer:
     # ------------------------------------------------------
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
-        loader = tqdm(self.train_loader)
         losses = list()
-        for batch, (img, targets) in enumerate(loader):
+        for batch, (img, targets) in enumerate(self.train_loader):
 
-            t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-            # img = img.to(torch.float16)
-            img = img.to(config.DEVICE)
-            targets = TargetTensor.fromDataLoader(self.scaled_anchors, t)
-            TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
+            targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
-                output = model(img)
+                output = model(img.to(config.DEVICE))
                 loss = targets.computeLossWith(output, self.loss)
 
             losses.append(loss.item())
@@ -135,8 +130,10 @@ class YoloTrainer:
             self.scaler.step(optimizer)
             self.scaler.update()
 
-            loader.set_postfix(loss=loss.item(), mean_loss=torch.mean(torch.tensor(losses)).item())
+            running_mean = torch.mean(torch.tensor(losses)).item()
+            self.train_loader.set_postfix(loss=loss.item(), mean_loss=running_mean)
 
+        return running_mean
 
     # ------------------------------------------------------
     @staticmethod
