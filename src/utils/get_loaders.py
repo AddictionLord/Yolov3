@@ -1,10 +1,9 @@
 import sys
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
 import config
 from dataset import Dataset
-
+from tqdm import tqdm
 
 
 
@@ -46,7 +45,7 @@ def getLoaders():
         drop_last=False,
     )
 
-    return train_loader, val_loader
+    return tqdm(train_loader), tqdm(val_loader)
 
 
 # ------------------------------------------------------

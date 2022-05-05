@@ -16,7 +16,7 @@ DEBUG = False
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
-BATCH_SIZE = 1
+BATCH_SIZE = 16
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
@@ -25,27 +25,27 @@ LAMBDA_COORD = 10 #10
 LAMBDA_NOOBJ = 0.5 #10
 
 # Training + scheduling
-NUM_OF_EPOCHS = 15000
-STEP_SIZE = 500 # Num of epochs after which lr will decay
-LEARNING_RATE = 1e-3
+NUM_OF_EPOCHS = 5000
+# STEP_SIZE = 500 # Num of epochs after which lr will decay
+LEARNING_RATE = 1e-4
 LR_DECAY = 10
 
 # Thresholds
-PROBABILITY_THRESHOLD = 0.97
-IOU_THRESHOLD = 0.2
+PROBABILITY_THRESHOLD = 0.8
+IOU_THRESHOLD = 0.5
 
 
 
 
 # ------------------------------------------------------
 # Paths
-# val_imgs_path = r'dataset/balanced/val2017'
-# val_annots_path = r'dataset/balanced/instances_val2017.json'
+val_imgs_path = r'dataset/balanced/val2017'
+val_annots_path = r'dataset/balanced/instances_val2017.json'
 train_imgs_path = r'dataset/balanced/train2017'
 train_annots_path = r'dataset/balanced/instances_train2017.json'
 
-val_imgs_path = r'dataset/val2017'
-val_annots_path = r'dataset/instances_val2017.json'
+# val_imgs_path = r'dataset/val2017'
+# val_annots_path = r'dataset/instances_val2017.json'
 # train_imgs_path = r'dataset/train2017'
 # train_annots_path = r'dataset/instances_train2017.json'
 
