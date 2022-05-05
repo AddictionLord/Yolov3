@@ -13,3 +13,4 @@ from .mean_average_precision import convertDataToMAP
 from .get_loaders import getValLoader
 from .get_loaders import getLoaders
 from .get_bboxes_to_evaluate import getBboxesToEvaluate
+from .train_supervisor import TrainSupervisor
