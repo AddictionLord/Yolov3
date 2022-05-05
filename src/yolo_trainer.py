@@ -86,6 +86,32 @@ class YoloTrainer:
 
 
     # ------------------------------------------------------
+    def _validate(self, model: Yolov3):
+
+        model.eval()
+        for batch_id, (img, targets) in enumerate(self.val_loader):
+
+            with torch.no_grad():
+                preds = model(img.to(config.DEVICE).to(torch.float32))
+
+            anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
+            preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, config.PROBABILITY_THRESHOLD)
+            targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
+            target_bboxes = targets.getBoundingBoxesFromDataloader(1)
+
+            for preds, targets in zip(preds_bboxes, target_bboxes):
+
+                preds, targets = convertDataToMAP(preds, targets)
+                self.mAP.update(preds, targets)
+
+        model.train()
+        mAP = self.mAP.compute()
+        self.mAP.reset()
+
+        return mAP
+
+
+    # ------------------------------------------------------
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
         loader = tqdm(self.train_loader)
