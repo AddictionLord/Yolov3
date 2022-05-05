@@ -114,7 +114,7 @@ def test(data_path, annots_path):
         batch_size = image.shape[0]
         for batch_img in range(batch_size):
             
-            plot_image(image[batch_img].permute(1, 2, 0).to('cpu'), bboxes[batch_img])
+            plot_image(image[batch_img].permute(1, 2, 0).to('cpu'), bboxes[batch_img].detach().cpu())
 
 
 
