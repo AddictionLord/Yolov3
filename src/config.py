@@ -251,7 +251,20 @@ COCO_LABELS = [
 # Connects COCO_LABLES with LABELS to train custom dataset 
 LABELS_INDICES = [COCO_LABELS.index(label) for label in LABELS]
 
-
+COLS = [
+    'epoch', 
+    'learning_rate',
+    'loss', 
+    'val_loss', 
+    'map', 
+    'map_50', 
+    'map_75', 
+    'map_large', 
+    'mar_1', 
+    'mar_10', 
+    'mar_100', 
+    'mar_large'
+]
 
 
 if __name__ == '__main__':
