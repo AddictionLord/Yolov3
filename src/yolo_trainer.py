@@ -185,83 +185,39 @@ class YoloTrainer:
 # ------------------------------------------------------
 def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
-    from torchvision.ops import nms, box_convert
-
     if isinstance(loader, torch.utils.data.DataLoader):
         img, targets = next(iter(loader))
 
     else:
-        img = loader
+        img = loader.to(config.DEVICE)
 
     model.eval()
-    img = img.to(config.DEVICE)
     with torch.no_grad():
 
         if preds is None:
-            preds = model(img)
-
-        batch_bboxes = [torch.tensor([]) for _ in range(img.shape[0])]
-        for scale, pred_on_scale in enumerate(preds):
-
-            boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
-                pred_on_scale, True, anchors[scale], thresh
-            )
-            for batch_img_id, (box) in enumerate(boxes_on_scale):
-
-                batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
+            preds = model(img.to(config.DEVICE))
 
         model.train()
 
-    for batch_img_id, b_bboxes in enumerate(batch_bboxes):
+    mAP = MeanAveragePrecision(box_format='cxcywh').to(config.DEVICE)
+    anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
+    pred_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, thresh)
+    targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
+    target_bboxes = targets.getBoundingBoxesFromDataloader(1)
+    for batch_img_id, (bpreds, btargets) in enumerate(zip(pred_bboxes, target_bboxes)):
 
-        xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        nms_indices = nms(xyxy, b_bboxes[..., 2], iou_thresh)
-        nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
-
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
-
-
-# ------------------------------------------------------------
-def createPerfectPredictionTensor(loader):
-
-    image, target = next(iter(loader))
-    # plot_image(image[0].permute(1,2,0).detach().cpu())
-
-    condition = (target[0][..., 0:1] == 1)
-    condition = condition.repeat(1, 1, 1, 1, 6)#.reshape(batch_size, -1, 6)
-    target[0][condition].reshape(-1, 6)
-    # print(target[0][condition].reshape(-1, 6))
-
-    values_idx = (target[0][..., 0:1] == 1).nonzero()
-    values_idx = values_idx[..., 2:4].tolist()
-
-    preds = target.copy()
-    preds[0] = torch.zeros(1, 3, 13, 13, 11)
-    preds[1] = torch.zeros(1, 3, 13, 13, 11)
-    preds[2] = torch.zeros(1, 3, 13, 13, 11)
-    preds[0][..., 0:3] = inv_sig(target[0][..., 0:3])
-    # preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2))
-    preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2))
-    # torch.log(1e-16 + target[..., 3:5] / anchors)
-    preds[0][0, 0, 6, 7, 5] = 6
-    preds[0][0, 0, 6, 8, 5] = 6
-
-
-    back_target = target.copy()
-    back_target[0][..., 0:3] = torch.sigmoid(preds[0][..., 0:3])
-    # back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2)
-    back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2)
-    back_target[0][..., 5] = torch.argmax(preds[0][..., 5:], dim=-1)
-
-    # print(torch.argmax(preds[0][..., 5:], dim=-1))
-    # print(target[0][0, 0, 6, 7, ...])
-    # print(back_target[0][0, 0, 6, 7, ...])
-
-    return preds
+        pdict, tdict = convertDataToMAP(bpreds, btargets)
+        mAP.update(pdict, tdict)
+        pprint(mAP.compute())
+        mAP.reset()
+        print(f'Targets shape: {btargets.shape}\n{btargets}')
+        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), btargets.detach().cpu())
+        print(f'Targets shape: {bpreds.shape}\n{bpreds}')
+        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), bpreds.detach().cpu())
 
 
 
-
+# ------------------------------------------------------
 if __name__ == '__main__':
 
     import config
