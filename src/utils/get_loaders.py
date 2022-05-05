@@ -49,7 +49,7 @@ def getLoaders():
 
 
 # ------------------------------------------------------
-def getValLoader():
+def getValLoader(subset: list=None):
     
     val_dataset = Dataset(
         config.val_imgs_path,
@@ -60,6 +60,9 @@ def getValLoader():
         config.test_transforms,
     )
 
+    if subset:
+        val_dataset = Subset(val_dataset, subset)
+
     val_loader = DataLoader(
         val_dataset,
         batch_size=config.BATCH_SIZE,
@@ -69,7 +72,8 @@ def getValLoader():
         drop_last=False,
     )
 
-    return val_loader
+    # return val_loader
+    return val_loader if subset else tqdm(val_loader)
 
 
 
