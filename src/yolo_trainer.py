@@ -55,32 +55,32 @@ class YoloTrainer:
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
         self.model = Yolov3(net['architecture'])
         self.model = self.model.to(config.DEVICE)
-        self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-        self.mAP = MeanAveragePrecision()
-        
+        self.optimizer = Adam(
+            self.model.parameters(), 
+            config.LEARNING_RATE, 
+            weight_decay=config.WEIGHT_DECAY
+        )
+        self.scheduler = ReduceLROnPlateau(
+            self.optimizer, 
+            factor=0.5, 
+            patience=5, 
+            min_lr=1e-7, 
+            verbose=True, 
+            threshold=1e-4,
+            cooldown=2
+        )
+        self.mAP = MeanAveragePrecision(box_format='cxcywh').to(config.DEVICE)
         if load:
-            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
+            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net, self.scheduler)
 
-        w = self.model.yolo[0].block[0].weight.data.clone()
         for epoch in range(config.NUM_OF_EPOCHS):
 
-            self._train(self.model, self.optimizer)
-            if epoch != 0 and epoch % 20 == 0:
-                print(f'{epoch}/{config.NUM_OF_EPOCHS}')
-                self.model.eval()
-                # TODO: Implement evaluating fcns
-                # checkClassAccuracy()
-                # preds_bboxes, target_bboxes = getBboxesToEvaluate(
-                #     self.model, self.val_loader, anchors.copy(), device, config.PROBABILITY_THRESHOLD
-                # )
-                # preds, target = convertDataToMAP(preds_bboxes, target_bboxes)
-                # self.mAP.update(preds, target)
-                # self.model.train()
-                for g in self.optimizer.param_groups:
-                     g['lr'] /= 10
-                     print(f'learning rate modified: {g["lr"]}')
-
-        print(w == self.model.yolo[0].block[0].weight.data)
+            loss = self._train(self.model, self.optimizer)
+            if epoch != 0 and epoch % 10 == 0:
+                mAP = self._validate(self.model)
+                self.scheduler.step(mAP["map"])
+                print(f'\n{epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
+                pprint(mAP)
 
         return self.model, self.optimizer
 
