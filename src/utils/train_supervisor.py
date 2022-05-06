@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     metric = MeanAveragePrecision()
     metric.update(preds, target)
-    # mAP = metric.compute()
+    mAP = metric.compute()
 
     from yolo import Yolov3
     model = Yolov3(config.yolo_config)
@@ -178,30 +178,30 @@ if __name__ == '__main__':
     )
 
 
-    # t = TrainSupervisor(config.DEVICE, optimizer=optimizer)
-    # t._updateDataFrame(mAP, 0, 2)
-    # t._updateDataFrame(mAP, 3, 12)
-    pprint(metric)
+    t = TrainSupervisor(config.DEVICE, optimizer=optimizer)
+
+    t.updateDataFrame(mAP, 0, 2)
+    t.updateDataFrame(mAP, 3, 12)
+
+    t.updateDataFrame([np.nan for _ in range(8)], 0, 2)
+    t.updateDataFrame([np.nan for _ in range(8)], 3, 12)
+
+    print(t.data[['epoch', 'loss', 'val_loss', 'map', 'map_50', 'map_75']].tail(1))
 
 
 
-    # df = pd.DataFrame(columns=config.COLS)
 
-    # e = pd.Series([20], name='epoch', dtype=np.float16)
-    # l = pd.Series([2], name='loss', dtype=np.float16)
-    # vl = pd.Series([0], name='val_loss', dtype=np.float16)
-    # lr = pd.Series([0.2], name='learning_rate', dtype=np.float16)
+    # e = pd.Series([2], name='epoch', dtype=np.int8)
+    # l = pd.Series([20], name='loss', dtype=np.float16)
+    # vl = pd.Series([22], name='val_loss', dtype=np.float16)
+    # lr = pd.Series([0.001], name='learning_rate', dtype=np.float16)
 
-    # row = pd.Series(mAP, dtype=np.float16)
-    # row = row[row >= 0].to_frame().T
-    # row = pd.concat((e, lr, l, vl, row), axis=1, ignore_index=True)
-    # row.columns = config.COLS
-    # # print(s)
+    # # nan = pd.Series([np.nan for _ in range(8)], dtype=np.float16)
+    # nan = pd.Series([np.nan for _ in range(8)], dtype=np.float16)
+    # # nan = pd.Index(mAP.values(), dtype=np.float16)
+    # nan = nan[nan != -1].to_frame().T
 
-    # df = pd.concat((df, row), axis=0, ignore_index=True)
-    # df = pd.concat((df, row), axis=0, ignore_index=True)
+    # nan = pd.concat((e, lr, l, vl, nan), axis=1, ignore_index=True)
 
-    # print(df)
-
-
+    # print(nan)
 
