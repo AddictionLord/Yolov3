@@ -5,14 +5,21 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import warnings
 from tqdm import tqdm
 from pprint import pprint
+import pandas
 
 import config
 from yolo import Yolov3
 from dataset import Dataset
 from loss import Loss
 
-from utils import getLoaders, TargetTensor, getBboxesToEvaluate, convertDataToMAP
 from thirdparty import plot_image
+from utils import (
+    getLoaders, 
+    TargetTensor, 
+    getBboxesToEvaluate, 
+    convertDataToMAP,
+    TrainSupervisor
+)
 
 # warnings.filterwarnings("ignore")
 torch.backends.cudnn.benchmark = True
@@ -61,28 +68,36 @@ class YoloTrainer:
             config.LEARNING_RATE, 
             weight_decay=config.WEIGHT_DECAY
         )
-        self.scheduler = ReduceLROnPlateau(
-            self.optimizer, 
-            factor=0.5, 
-            patience=5, 
-            min_lr=1e-7, 
-            verbose=True, 
-            threshold=1e-4,
-            cooldown=2
-        )
-        self.mAP = MeanAveragePrecision(box_format='cxcywh').to(config.DEVICE)
+        self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
+        
         if load:
-            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net, self.scheduler)
+            YoloTrainer.uploadParamsToModel(
+                net, self.model, self.optimizer, self.supervisor
+            )
 
         for epoch in range(config.NUM_OF_EPOCHS):
 
             loss = self._train(self.model, self.optimizer)
-            if epoch != 0 and epoch % 10 == 0:
-                mAP = self._validate(self.model)
-                self.scheduler.step(mAP["map"])
-                print(f'\n{epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
-                pprint(mAP)
 
+            if epoch % 10 == 0 and epoch != 0:
+                self._validate(self.model)
+                print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
+                mAP = self.supervisor.update(loss)
+                print(self.supervisor.data[['epoch', 'loss', 'val_loss', 'map', 'map_50', 'map_75']].tail(1))
+
+            else:
+                mAP = self.supervisor.update(loss)
+
+
+            if mAP > self.supervisor.best_mAP:
+                self.supervisor.best_mAP = mAP
+                YoloTrainer.saveModel(
+                    f'{self.supervisor.name}_checkpoint', 
+                    self.model, 
+                    self.optimizer, 
+                    self.supervisor
+                )
+            
         return self.model, self.optimizer
 
 
