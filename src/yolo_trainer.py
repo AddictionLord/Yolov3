@@ -153,30 +153,35 @@ class YoloTrainer:
 
         return running_mean
 
+
     # ------------------------------------------------------
     @staticmethod
     def saveModel(
+        filename: str,
         model: Yolov3, 
         optimizer: torch.optim, 
-        path: str="./models/test_model.pth.tar",
-        scheduler:torch.optim.lr_scheduler=None   
+        supervisor: TrainSupervisor=None, 
     ):
 
         container = {
+            "filename": f'{filename}.pth.tar',
+            "architecture": model.config,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
-            "architecture": model.config,
-            "scheduler": scheduler,
+            "scheduler": supervisor.scheduler.state_dict(),
+            "train_data": supervisor.state_dict(filename)
         }
 
+        path = f'./models/{filename}.pth.tar'
         torch.save(container, path)
         print(f"[YOLO TRAINER]: Model saved to {path}")
 
 
     # ------------------------------------------------------
     @staticmethod
-    def loadModel(path: str="./models/test_model.pth.tar"):
+    def loadModel(filename: str="test_model"):
 
+        path = f'./models/{filename}.pth.tar'
         print(f"[YOLO TRAINER]: Loading model container {path}")
 
         return torch.load(path, map_location=config.DEVICE)
@@ -185,10 +190,10 @@ class YoloTrainer:
     # ------------------------------------------------------
     @staticmethod
     def uploadParamsToModel(
-        model: Yolov3, 
         params: dict, 
+        model: Yolov3, 
         optimizer: torch.optim=None, 
-        scheduler:torch.optim.lr_scheduler.StepLR=None
+        supervisor: TrainSupervisor=None
     ):
 
         print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
@@ -196,8 +201,11 @@ class YoloTrainer:
         if optimizer and 'optimizer' in params.keys():
             optimizer.load_state_dict(params['optimizer'])
 
-        if scheduler and 'scheduler' in params.keys():
-            scheduler.load_state_dict(params['scheduler'])
+        if supervisor and 'scheduler' in params.keys():
+            supervisor.scheduler.load_state_dict(params['scheduler'])
+
+        if supervisor and 'train_data' in params.keys():
+            supervisor.load_state_dict(params['train_data'])          
 
 
 # ------------------------------------------------------
@@ -238,10 +246,6 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-    import config
-    import torch
-    from yolo import Yolov3
-    from dataset import Dataset
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
 
 
@@ -256,11 +260,11 @@ if __name__ == '__main__':
     # ------------------------------------------------------------
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('./models/gpu_training_overnight.pth.tar')
+    container = YoloTrainer.loadModel('supervisor')
 
     try:
-        # t.trainYoloNet(container, load=True)
-        t.trainYoloNet(container)
+        t.trainYoloNet(container, load=True)
+        # t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -269,13 +273,13 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/gpu.pth.tar")
+        YoloTrainer.saveModel("supervisor", t.model, t.optimizer, t.supervisor)
 
 
 
 
     # t = YoloTrainer()
     # container = {'architecture': config.yolo_config}
-    # # container = YoloTrainer.loadModel('./models/gpu_training_overnight.pth.tar')
+    # container = YoloTrainer.loadModel('supervisor')
 
-    # t.trainYoloNet(container)
+    # t.trainYoloNet(container, load=True)
