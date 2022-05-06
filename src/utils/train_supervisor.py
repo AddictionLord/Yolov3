@@ -83,25 +83,40 @@ class TrainSupervisor:
             preds, targets = TrainSupervisor._convertDataToMAP(preds, targets)
             self.mAP.update(preds, targets)
 
-        mAP = self.mAP.compute()
-        self.mAP.reset()
-        self.updateDataFrame(mAP, loss, val_loss)
+
+    # ------------------------------------------------------
+    # Accepts loss and val_loss, computes new mAP values and update dataFrame
+    def update(self, loss):
+
+        self.last_epoch += 1
+
+        if self.mAP._update_called:
+            self.mAP_dict = self.mAP.compute()
+            self.mAP.reset()
+            self.scheduler.step(self.mAP_dict["map"])
+            self.mAP._update_called = False
+
+        mAP = self.mAP_dict if isinstance(self.mAP_dict, dict) else [np.nan for _ in range(8)]
+        self.updateDataFrame(mAP, loss, self.val_loss)
+
+        return mAP["map"] if isinstance(mAP, dict) else - np.inf
         
 
     # ------------------------------------------------------
     # Creates new index in dataFrame with passed values
     def updateDataFrame(self, mAP, loss, val_loss):
 
-        lrate = self.scheduler.optimizer.param_groups[0]['lr'] if hasattr(self, 'scheduler') else config.LEARNING_RATE
+        lrate = self.scheduler.optimizer.param_groups[0]['lr']
 
         # Creating pandas series to integrate into DataFrame 
-        e = pd.Series([self.last_epoch], name='epoch', dtype=np.int16)
+        e = pd.Series([self.last_epoch], name='epoch', dtype=np.int8)
         l = pd.Series([loss], name='loss', dtype=np.float16)
         vl = pd.Series([val_loss], name='val_loss', dtype=np.float16)
         lr = pd.Series([lrate], name='learning_rate', dtype=np.float16)
 
+        mAP = {k: v.cpu() for k, v in mAP.items()} if isinstance(mAP, dict) else mAP
         row = pd.Series(mAP, dtype=np.float16)
-        row = row[row >= 0].to_frame().T
+        row = row[row != -1].to_frame().T
         row = pd.concat((e, lr, l, vl, row), axis=1, ignore_index=True)
         row.columns = config.COLS
 
