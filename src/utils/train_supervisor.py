@@ -21,9 +21,13 @@ import config
 # 2. Scheduling of learning rate
 # 3. Saving checkpoint of model at best mAP score, saving dataFrame
 class TrainSupervisor:
-    def __init__(self, device, optimizer, epoch=0):
+    def __init__(self, device, optimizer, epoch=0, name: str=None):
 
+        self.name = name
         self.last_epoch = epoch
+        self.val_loss = np.nan
+        self.best_mAP = - np.inf
+        self.mAP_dict = list()
         self.data = pd.DataFrame(columns=config.COLS)
         self.mAP = MeanAveragePrecision(box_format='cxcywh').to(device)
         self.scheduler = ReduceLROnPlateau(
@@ -38,9 +42,41 @@ class TrainSupervisor:
 
 
     # ------------------------------------------------------
-    # Accepts targets and pred from whole batch, computes new mAP values
-    # and update dataFrame
-    def update(preds_bboxes, target_bboxes, loss, val_loss):
+    def state_dict(self, filename: str):
+
+        state = {
+            'filename': filename,
+            'last_epoch': self.last_epoch,
+            'val_loss': self.val_loss,
+            'best_mAP': self.best_mAP,
+            'mAP_dict': self.mAP_dict,
+            'mAP': self.mAP.state_dict(),
+        }
+        path = f'./models/train_data/{filename}.pkl'
+        self.data.to_pickle(path)
+        print(f'[TRAIN SUPERVISOR]: Train data stored to {path}')
+        
+        return state
+
+
+    # ------------------------------------------------------
+    def load_state_dict(self, state_dict: dict):
+
+        path = f'./models/train_data/{state_dict["filename"]}.pkl'
+        self.name = state_dict["filename"]
+        self.last_epoch = state_dict['last_epoch']
+        self.val_loss = state_dict['val_loss']
+        self.best_mAP = state_dict['best_mAP']
+        self.mAP_dict = state_dict['mAP_dict']
+
+        self.data = pd.read_pickle(path)
+        print(self.data)
+        print(f'[TRAIN SUPERVISOR]: Train data loaded from {path}')
+
+
+    # ------------------------------------------------------
+    # Accepts targets and pred from whole batch, updates mAP state
+    def updateMAP(self, preds_bboxes, target_bboxes):
 
         for preds, targets in zip(preds_bboxes, target_bboxes):
 
