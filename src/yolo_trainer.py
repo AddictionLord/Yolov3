@@ -104,34 +104,36 @@ class YoloTrainer:
     # ------------------------------------------------------
     def _validate(self, model: Yolov3):
 
-        model.eval()
+        loader = tqdm(self.val_loader)
         for batch_id, (img, targets) in enumerate(self.val_loader):
 
+            val_losses = list()
             with torch.no_grad():
                 preds = model(img.to(config.DEVICE).to(torch.float32))
 
-            anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
-            preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, config.PROBABILITY_THRESHOLD)
-            targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
-            target_bboxes = targets.getBoundingBoxesFromDataloader(1)
+                anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
+                preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, config.PROBABILITY_THRESHOLD)
+                
+                targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
+                val_loss = targets.computeLossWith(preds, self.loss)
+                target_bboxes = targets.getBoundingBoxesFromDataloader(1)
 
-            for preds, targets in zip(preds_bboxes, target_bboxes):
+                self.supervisor.updateMAP(preds_bboxes, target_bboxes)
+                val_losses.append(val_loss)
+                running_mean = torch.mean(torch.tensor(val_losses)).item()
 
-                preds, targets = convertDataToMAP(preds, targets)
-                self.mAP.update(preds, targets)
+                loader.set_postfix(loss=val_loss.item(), mean_loss=running_mean)
 
         model.train()
-        mAP = self.mAP.compute()
-        self.mAP.reset()
-
-        return mAP
+        self.supervisor.val_loss = running_mean
 
 
     # ------------------------------------------------------
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
         losses = list()
-        for batch, (img, targets) in enumerate(self.train_loader):
+        loader = tqdm(self.train_loader)
+        for batch, (img, targets) in enumerate(loader):
 
             targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
@@ -147,7 +149,7 @@ class YoloTrainer:
             self.scaler.update()
 
             running_mean = torch.mean(torch.tensor(losses)).item()
-            self.train_loader.set_postfix(loss=loss.item(), mean_loss=running_mean)
+            loader.set_postfix(loss=loss.item(), mean_loss=running_mean)
 
         return running_mean
 
