@@ -1,11 +1,12 @@
 import torch
-from torch.optim import Adam, SGD
+from torch.optim import RAdam, Adam, SGD
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import warnings
 from tqdm import tqdm
 from pprint import pprint
 import pandas
+import copy
 
 import config
 from yolo import Yolov3
@@ -14,7 +15,7 @@ from loss import Loss
 
 from thirdparty import plot_image
 from utils import (
-    getLoaders, 
+    getLoaders, getValLoader,
     TargetTensor, 
     getBboxesToEvaluate, 
     convertDataToMAP,
@@ -149,7 +150,7 @@ class YoloTrainer:
             targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
                 output = model(img.to(config.DEVICE))
-                loss = targets.computeLossWith(output, self.loss)
+                loss = targets.computeLossWith(output, self.loss, debug=True)
 
             losses.append(loss.item())
             optimizer.zero_grad()
@@ -219,39 +220,6 @@ class YoloTrainer:
             supervisor.load_state_dict(params['train_data'])          
 
 
-# ------------------------------------------------------
-def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
-
-    if isinstance(loader, torch.utils.data.DataLoader):
-        img, targets = next(iter(loader))
-
-    else:
-        img = loader.to(config.DEVICE)
-
-    model.eval()
-    with torch.no_grad():
-
-        if preds is None:
-            preds = model(img.to(config.DEVICE))
-
-        model.train()
-
-    mAP = MeanAveragePrecision(box_format='cxcywh').to(config.DEVICE)
-    anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
-    pred_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, thresh)
-    targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
-    target_bboxes = targets.getBoundingBoxesFromDataloader(1)
-    for batch_img_id, (bpreds, btargets) in enumerate(zip(pred_bboxes, target_bboxes)):
-
-        pdict, tdict = convertDataToMAP(bpreds, btargets)
-        mAP.update(pdict, tdict)
-        pprint(mAP.compute())
-        mAP.reset()
-        print(f'Targets shape: {btargets.shape}\n{btargets}')
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), btargets.detach().cpu())
-        print(f'Targets shape: {bpreds.shape}\n{bpreds}')
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), bpreds.detach().cpu())
-
 
 
 # ------------------------------------------------------
@@ -260,16 +228,9 @@ if __name__ == '__main__':
     from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
 
 
-    # ------------------------------------------------------------
-    # Test of plotting fcns and bbox calculations 
-
-    # preds = createPerfectPredictionTensor(loader)
-    # plotDetections(model, image, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS, preds)
-
-
 
     # ------------------------------------------------------------
-    t = YoloTrainer()
+    t = YoloTrainer((getValLoader([6], False), getValLoader([6], False)))
     container = {'architecture': config.yolo_config}
     container = YoloTrainer.loadModel('supervisor')
 
@@ -284,11 +245,12 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        YoloTrainer.saveModel("supervisor", t.model, t.optimizer, t.supervisor)
+        YoloTrainer.saveModel("bike6", t.model, t.optimizer, t.supervisor)
 
 
 
 
+    # ------------------------------------------------------------
     # t = YoloTrainer()
     # container = {'architecture': config.yolo_config}
     # container = YoloTrainer.loadModel('supervisor')
