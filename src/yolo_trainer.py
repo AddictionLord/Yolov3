@@ -111,6 +111,7 @@ class YoloTrainer:
     # ------------------------------------------------------
     def _validate(self, model: Yolov3):
 
+        model.eval()
         loader = tqdm(self.val_loader)
         for batch_id, (img, targets) in enumerate(self.val_loader):
 
@@ -119,13 +120,15 @@ class YoloTrainer:
                 preds = model(img.to(config.DEVICE).to(torch.float32))
 
                 anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
-                preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(preds, anchors, config.PROBABILITY_THRESHOLD)
-                
+                preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(
+                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=False
+                )
                 targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
-                val_loss = targets.computeLossWith(preds, self.loss)
                 target_bboxes = targets.getBoundingBoxesFromDataloader(1)
 
                 self.supervisor.updateMAP(preds_bboxes, target_bboxes)
+
+                val_loss = targets.computeLossWith(preds, self.loss, debug=False)
                 val_losses.append(val_loss)
                 running_mean = torch.mean(torch.tensor(val_losses)).item()
 
@@ -133,6 +136,7 @@ class YoloTrainer:
 
         model.train()
         self.supervisor.val_loss = running_mean
+        return running_mean
 
 
     # ------------------------------------------------------
