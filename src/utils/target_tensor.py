@@ -23,7 +23,7 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Computes loss with another list of tensors with given loss fcn
-    def computeLossWith(self, preds: list, loss_fcn):
+    def computeLossWith(self, preds: list, loss_fcn, debug=False):
 
         targets, d = self.tensor, torch.device(config.DEVICE)
         TargetTensor.passTargetsToDevice(preds, d)
@@ -33,7 +33,7 @@ class TargetTensor:
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
             # print(self.anchors)
-            loss += loss_fcn(pred, target, self.anchors[scale, ...])
+            loss += loss_fcn(pred, target, self.anchors[scale, ...], debug)
 
         return loss
 
@@ -65,7 +65,7 @@ class TargetTensor:
     # ------------------------------------------------------
     # Compute BBs from models predictions (iterating over all the scales)
     @staticmethod
-    def computeBoundingBoxesFromPreds(preds, anchors, thresh):
+    def computeBoundingBoxesFromPreds(preds, anchors, thresh, nms=True):
 
         batch_bboxes = [torch.tensor([], device=config.DEVICE) for _ in range(preds[0].shape[0])]
         for scale, pred_on_scale in enumerate(preds):
@@ -77,12 +77,13 @@ class TargetTensor:
 
                 batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
 
-        # Now for every image in batch we need to NMS
-        for batch_img_id, boxes in enumerate(batch_bboxes):
+        if nms:
+            # Now for every image in batch we need to NMS
+            for batch_img_id, boxes in enumerate(batch_bboxes):
 
-            batch_bboxes[batch_img_id] = nonMaxSuppression(
-                boxes.unsqueeze(0), config.IOU_THRESHOLD, thresh
-            )[0]
+                batch_bboxes[batch_img_id] = nonMaxSuppression(
+                    boxes.unsqueeze(0), config.IOU_THRESHOLD, thresh
+                )[0]
 
         return batch_bboxes
 
