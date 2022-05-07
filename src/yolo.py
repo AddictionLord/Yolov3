@@ -42,14 +42,14 @@ config = [
 
 
 class Yolov3(nn.Module, CNNBuilder):
-    def __init__(self, config: list, in_channels=3, num_of_classes=6):
+    def __init__(self, config: list, in_channels=3, num_of_classes=6, pretrained=True):
         super(Yolov3, self).__init__()
 
         self.config = config
         self.in_channels = in_channels
         self.num_of_classes = num_of_classes
 
-        self.darknet = Darknet(in_channels, pretrained=True)
+        self.darknet = Darknet(in_channels, pretrained=pretrained)
         self.yolo = self._constructNeuralNetwork(config, self.darknet.out_channels)
 
 
