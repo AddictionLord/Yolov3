@@ -109,7 +109,7 @@ class TrainSupervisor:
         lrate = self.scheduler.optimizer.param_groups[0]['lr']
 
         # Creating pandas series to integrate into DataFrame 
-        e = pd.Series([self.last_epoch], name='epoch', dtype=np.int8)
+        e = pd.Series([self.last_epoch], name='epoch', dtype=np.int32)
         l = pd.Series([loss], name='loss', dtype=np.float16)
         vl = pd.Series([val_loss], name='val_loss', dtype=np.float16)
         lr = pd.Series([lrate], name='learning_rate', dtype=np.float16)
