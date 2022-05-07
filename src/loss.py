@@ -21,8 +21,10 @@ class Loss(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         # Values from Yolov1 paper
-        self.lambda_coord = config.LAMBDA_COORD #10
+        self.lambda_box = config.LAMBDA_COORD #10
         self.lambda_noobj = config.LAMBDA_NOOBJ #0.5 #10
+        self.lambda_obj = config.LAMBDA_OBJ
+        self.lambda_class = config.LAMBDA_CLASS
 
 
     # ------------------------------------------------------
@@ -32,7 +34,7 @@ class Loss(nn.Module):
     #                   5 + num_of_classes (= 11): [score, x, y, w, h, num_of_classes..(6)]
     # anchors shape: [3, 2] - for each scale we have 3 anchors with 2 values
     # This computes loss only for one scale (need to call 3 times)
-    def forward(self, predictions, target, anchors):
+    def forward(self, predictions, target, anchors, debug=False):
 
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
@@ -42,9 +44,9 @@ class Loss(nn.Module):
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        # obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
 
-        obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
+        # obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
         # print()
 
         # loss when there is no object
@@ -71,7 +73,7 @@ class Loss(nn.Module):
         box_loss[torch.isnan(box_loss)]         = 0
         class_loss[torch.isnan(class_loss)]     = 0
 
-        if config.DEBUG:
+        if config.DEBUG or debug:
             print('preds:\n', predictions[..., 0:1][Iobj])
             print('targets:\n', target[..., 0:1][Iobj])
 
@@ -81,10 +83,10 @@ class Loss(nn.Module):
             print(f'Box loss: {box_loss}')
 
         # loss fcn
-        return (self.lambda_coord * box_loss 
-            + obj_loss * 5
-            + self.lambda_noobj * noobj_loss 
-            + class_loss
+        return (self.lambda_box * box_loss 
+            + self.lambda_obj * obj_loss
+            + self.lambda_noobj * noobj_loss
+            + self.lambda_class * class_loss
         )
 
 
