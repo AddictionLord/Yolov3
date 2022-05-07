@@ -16,23 +16,26 @@ DEBUG = False
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
-BATCH_SIZE = 16
+BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
-WEIGHT_DECAY = 1e-4
-LAMBDA_COORD = 10 #10
-LAMBDA_NOOBJ = 0.5 #10
+WEIGHT_DECAY = 1e-3
+
+# Loss constants
+LAMBDA_COORD = 20 #10
+LAMBDA_NOOBJ = 1 #10
+LAMBDA_OBJ = 5
+LAMBDA_CLASS = 3
 
 # Training + scheduling
 NUM_OF_EPOCHS = 5000
-# STEP_SIZE = 500 # Num of epochs after which lr will decay
 LEARNING_RATE = 1e-4
 LR_DECAY = 10
 
 # Thresholds
 PROBABILITY_THRESHOLD = 0.8
-IOU_THRESHOLD = 0.5
+IOU_THRESHOLD = 0.2
 
 
 
@@ -80,17 +83,17 @@ train_transforms = A.Compose(
         ),
         A.RandomCrop(width=IMAGE_SIZE, height=IMAGE_SIZE),
         A.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.6, hue=0.6, p=0.4),
-        A.OneOf(
-            [
-                A.ShiftScaleRotate(
-                    rotate_limit=20, p=0.5, border_mode=cv2.BORDER_CONSTANT
-                ),
-                A.Affine(shear=15, p=0.5, mode=cv2.BORDER_CONSTANT),
-            ],
-            p=1.0,
-        ),
+        # A.OneOf(
+        #     [
+        #         A.ShiftScaleRotate(
+        #             rotate_limit=20, p=0.5, border_mode=cv2.BORDER_CONSTANT
+        #         ),
+        #         A.Affine(shear=15, p=0.5, mode=cv2.BORDER_CONSTANT),
+        #     ],
+        #     p=1.0,
+        # ),
         A.HorizontalFlip(p=0.5),
-        A.Blur(p=0.1),
+        A.Blur(p=0.05),
         A.CLAHE(p=0.1),
         A.Posterize(p=0.1),
         A.ToGray(p=0.1),
