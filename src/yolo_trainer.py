@@ -60,22 +60,25 @@ class YoloTrainer:
 
     
     # ------------------------------------------------------
-    # Method to train specific Yolo architecture and return model
+    # Method to train specific Yolo architecture and return model + optimizer
     def trainYoloNet(self, net: dict, load: bool=False):
 
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
-        self.model = Yolov3(net['architecture'])
+        self.model = Yolov3(net['architecture'], pretrained=True)
         self.model = self.model.to(config.DEVICE)
-        self.optimizer = Adam(
+        self.optimizer = RAdam(
             self.model.parameters(), 
             config.LEARNING_RATE, 
-            weight_decay=config.WEIGHT_DECAY
+            # weight_decay=config.WEIGHT_DECAY
         )
         self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
         
         if load:
             YoloTrainer.uploadParamsToModel(
-                net, self.model, self.optimizer, self.supervisor
+                net, 
+                self.model, 
+                self.optimizer, 
+                self.supervisor
             )
 
         for epoch in range(config.NUM_OF_EPOCHS):
@@ -83,14 +86,15 @@ class YoloTrainer:
             loss = self._train(self.model, self.optimizer)
 
             if epoch % 10 == 0 and epoch != 0:
-                self._validate(self.model)
+                val_loss = self._validate(self.model)
                 print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
                 mAP = self.supervisor.update(loss)
-                print(self.supervisor.data[['epoch', 'loss', 'val_loss', 'map', 'map_50', 'map_75']].tail(1))
+                print(self.supervisor.data[[
+                    'epoch', 'learning_rate', 'loss', 'val_loss', 'map', 'map_50', 'map_75'
+                ]].tail(1))
 
             else:
                 mAP = self.supervisor.update(loss)
-
 
             if mAP > self.supervisor.best_mAP:
                 self.supervisor.best_mAP = mAP
