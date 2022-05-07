@@ -45,10 +45,13 @@ Saving and loading models:
 
 
 class YoloTrainer:
-    def __init__(self):
+    def __init__(self, loaders=getLoaders()):
 
         self.loss = Loss()
-        self.train_loader, self.val_loader = getLoaders() 
+
+        self.train_loader, self.val_loader = loaders
+        # self.train_loader, self.val_loader = getValLoader([2], False), getValLoader([2], False) 
+
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
