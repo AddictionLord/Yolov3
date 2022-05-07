@@ -33,7 +33,7 @@ class TrainSupervisor:
         self.scheduler = ReduceLROnPlateau(
             optimizer, 
             factor=0.5, 
-            patience=5, 
+            patience=20, 
             min_lr=1e-7, 
             verbose=True, 
             threshold=1e-4,
@@ -93,7 +93,8 @@ class TrainSupervisor:
         if self.mAP._update_called:
             self.mAP_dict = self.mAP.compute()
             self.mAP.reset()
-            self.scheduler.step(self.mAP_dict["map"])
+            # self.scheduler.step(self.mAP_dict["map"])
+            self.scheduler.step(self.val_loss)
             self.mAP._update_called = False
 
         mAP = self.mAP_dict if isinstance(self.mAP_dict, dict) else [np.nan for _ in range(8)]
@@ -112,7 +113,7 @@ class TrainSupervisor:
         e = pd.Series([self.last_epoch], name='epoch', dtype=np.int32)
         l = pd.Series([loss], name='loss', dtype=np.float16)
         vl = pd.Series([val_loss], name='val_loss', dtype=np.float16)
-        lr = pd.Series([lrate], name='learning_rate', dtype=np.float16)
+        lr = pd.Series([lrate], name='learning_rate', dtype=np.float64)
 
         mAP = {k: v.cpu() for k, v in mAP.items()} if isinstance(mAP, dict) else mAP
         row = pd.Series(mAP, dtype=np.float16)

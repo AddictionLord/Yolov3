@@ -12,6 +12,7 @@ class Visualizer:
         self.path = f'./models/train_data/{filename}.pkl'
         self.data = pd.read_pickle(self.path)
 
+        print(f'[VISUALIZER]: Opening file ./models/train_data/{filename}.pkl')
         # print(data)
 
 
@@ -75,7 +76,7 @@ class Visualizer:
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    v = Visualizer('supervisor_checkpoint')
+    v = Visualizer('supervisor')
     
     # v.viewLoss()
     # v.viewAccuracy()

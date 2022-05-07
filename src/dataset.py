@@ -17,7 +17,7 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 '''
 
-
+# Anchors passed to dataset should be normalized to image size (config.ANCHORS)
 class Dataset(CocoDetection):
     def __init__(self, 
         root: str, annFile: str, anchors: list, S=[13, 26, 52], C=6,transform=None
@@ -43,6 +43,7 @@ class Dataset(CocoDetection):
         bboxes = list()
         for Object in anns:
 
+            # print(img_info['file_name'])
             bbox = BoundingBox(Object, form='coco')
             bbox.normalize(img_info['width'], img_info['height'])
             bboxes.append(bbox.toTransform())
