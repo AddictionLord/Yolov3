@@ -54,6 +54,6 @@ class WeightsHandler:
             nn.init.kaiming_uniform_(layer.weight, a=0.1)
 
         elif isinstance(layer, nn.BatchNorm2d):
-            nn.init.kaiming_uniform_(layer.weight, a=0.1)
-            # layer.weight.data.fill_(1)
-            layer.bias.data.zero_() 
+            # nn.init.kaiming_uniform_(layer.weight, a=0.1)
+            layer.weight.data.fill_(1)
+            nn.init.zeros_(layer.bias) 
