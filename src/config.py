@@ -16,7 +16,7 @@ DEBUG = False
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
-BATCH_SIZE = 1
+BATCH_SIZE = 16
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
@@ -24,8 +24,8 @@ WEIGHT_DECAY = 1e-3
 
 # Loss constants
 LAMBDA_COORD = 10 #10
-LAMBDA_NOOBJ = 10 #10
-LAMBDA_OBJ = 10
+LAMBDA_NOOBJ = 20 #10
+LAMBDA_OBJ = 5
 LAMBDA_CLASS = 5
 
 # Training + scheduling
@@ -33,7 +33,7 @@ NUM_OF_EPOCHS = 5000
 LEARNING_RATE = 1e-5
 
 # Thresholds
-PROBABILITY_THRESHOLD = 0.96
+PROBABILITY_THRESHOLD = 0.8
 IOU_THRESHOLD = 0.2
 
 
@@ -46,10 +46,10 @@ val_annots_path = r'dataset/balanced/instances_val2017.json'
 train_imgs_path = r'dataset/balanced/train2017'
 train_annots_path = r'dataset/balanced/instances_train2017.json'
 
-# val_imgs_path = r'dataset/val2017'
-# val_annots_path = r'dataset/instances_val2017.json'
-# train_imgs_path = r'dataset/train2017'
-# train_annots_path = r'dataset/instances_train2017.json'
+full_val_imgs_path = r'dataset/val2017'
+full_val_annots_path = r'dataset/instances_val2017.json'
+full_train_imgs_path = r'dataset/train2017'
+full_train_annots_path = r'dataset/instances_train2017.json'
 
 darknet53_path = 'models/pretrained/darknet53.conv.74'
 

@@ -103,7 +103,7 @@ class Visualizer:
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    v = Visualizer('bike6')
+    v = Visualizer('bike6_pretrained')
     
     # v.viewLoss()
     # v.viewAccuracy()

@@ -13,8 +13,8 @@ from tqdm import tqdm
 def getLoaders(loadbar=True):
 
     train_dataset = dataset.Dataset(
-        config.train_imgs_path,
-        config.train_annots_path,
+        config.full_train_imgs_path,
+        config.full_train_annots_path,
         config.ANCHORS,
         config.CELLS_PER_SCALE,
         config.NUM_OF_CLASSES,
@@ -30,8 +30,8 @@ def getLoaders(loadbar=True):
     )
 
     val_dataset = dataset.Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
+        config.full_val_imgs_path,
+        config.full_val_annots_path,
         config.ANCHORS,
         config.CELLS_PER_SCALE,
         config.NUM_OF_CLASSES,

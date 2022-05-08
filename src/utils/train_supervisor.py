@@ -33,7 +33,7 @@ class TrainSupervisor:
         self.scheduler = ReduceLROnPlateau(
             optimizer, 
             factor=0.5, 
-            patience=20, 
+            patience=10, 
             min_lr=1e-7, 
             verbose=True, 
             threshold=1e-4,
