@@ -129,7 +129,7 @@ class YoloTrainer:
 
                 self.supervisor.updateMAP(preds_bboxes, target_bboxes)
 
-                val_loss = targets.computeLossWith(preds, self.loss, debug=False)
+                val_loss = targets.computeLossWith(preds, self.loss, debug=True)
                 val_losses.append(val_loss)
                 running_mean = torch.mean(torch.tensor(val_losses)).item()
 
@@ -150,7 +150,7 @@ class YoloTrainer:
             targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
                 output = model(img.to(config.DEVICE))
-                loss = targets.computeLossWith(output, self.loss, debug=True)
+                loss = targets.computeLossWith(output, self.loss, debug=False)
 
             losses.append(loss.item())
             optimizer.zero_grad()
@@ -230,14 +230,14 @@ if __name__ == '__main__':
 
 
     # ------------------------------------------------------------
-    t = YoloTrainer((getValLoader([6], False), getValLoader([6], False)))
-    # t = YoloTrainer()
+    # t = YoloTrainer((getValLoader([6], False), getValLoader([6], False)))
+    t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('bike6')
+    container = YoloTrainer.loadModel('gpu_fixed_loss')
 
     try:
-        # t.trainYoloNet(container, load=True)
-        t.trainYoloNet(container)
+        t.trainYoloNet(container, load=True)
+        # t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -246,12 +246,13 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        YoloTrainer.saveModel("bike6", t.model, t.optimizer, t.supervisor)
+        pass
+        YoloTrainer.saveModel("full_pretrained", t.model, t.optimizer, t.supervisor)
 
 
 
 
-    # # ------------------------------------------------------------
+    # ------------------------------------------------------------
     # t = YoloTrainer()
     # container = {'architecture': config.yolo_config}
     # container = YoloTrainer.loadModel('gpu')
