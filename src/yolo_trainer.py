@@ -122,7 +122,7 @@ class YoloTrainer:
 
                 anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
                 preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(
-                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=False
+                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=True
                 )
                 targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
                 target_bboxes = targets.getBoundingBoxesFromDataloader(1)
@@ -231,12 +231,13 @@ if __name__ == '__main__':
 
     # ------------------------------------------------------------
     t = YoloTrainer((getValLoader([6], False), getValLoader([6], False)))
+    # t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('supervisor')
+    # container = YoloTrainer.loadModel('bike6')
 
     try:
-        t.trainYoloNet(container, load=True)
-        # t.trainYoloNet(container)
+        # t.trainYoloNet(container, load=True)
+        t.trainYoloNet(container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -250,9 +251,9 @@ if __name__ == '__main__':
 
 
 
-    # ------------------------------------------------------------
+    # # ------------------------------------------------------------
     # t = YoloTrainer()
     # container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('supervisor')
+    # container = YoloTrainer.loadModel('gpu')
 
     # t.trainYoloNet(container, load=True)
