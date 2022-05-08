@@ -14,7 +14,7 @@ https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9
 
 
 class Loss(nn.Module):
-    def __init__(self):
+    def __init__(self, testing=False):
         super().__init__()
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss(reduction='mean')
@@ -27,6 +27,14 @@ class Loss(nn.Module):
         self.lambda_obj = config.LAMBDA_OBJ
         self.lambda_class = config.LAMBDA_CLASS
 
+        def returnsOnes(pred, targets):
+
+            return torch.ones(pred.shape[0], device=config.DEVICE).reshape(-1, 1)
+
+        self.iou_fcn = returnsOnes if testing else iou
+
+
+
 
     # ------------------------------------------------------
     # target shape: [batches, num_of_anchors, cells_x, cells_y, bounding_box/anchor_data]
@@ -37,18 +45,23 @@ class Loss(nn.Module):
     # This computes loss only for one scale (need to call 3 times)
     def forward(self, predictions, target, anchors, debug=False):
 
+        # ------------------------------------------------------
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
+        # d = torch.ones(target[..., 0].shape).to(config.DEVICE) - Iobj.float()
+
 
         # ------------------------------------------------------
         # BCE uses sigmoid inside!!!
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
+        # print(torch.allclose(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj]))
+
 
         # ------------------------------------------------------
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+        obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
 
         # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         # ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
@@ -64,6 +77,7 @@ class Loss(nn.Module):
         # obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
         # print()
 
+
         # ------------------------------------------------------
         # box coordinates loss
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
@@ -71,7 +85,6 @@ class Loss(nn.Module):
         # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
 
-        # ------------------------------------------------------
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         # wh_loss = self.mse(preds[..., 3:5][Iobj], target[..., 3:5][Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
@@ -80,7 +93,7 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
         
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         # noobj_loss[torch.isnan(noobj_loss)]     = 0
@@ -182,6 +195,12 @@ if __name__ == "__main__":
     # print(cnt)
 
     bce = nn.BCEWithLogitsLoss()
-    i = torch.FloatTensor([7, 7])
+    i = torch.FloatTensor([torch.inf, torch.inf]).clip(min=1e-16, max=1e+16)
     t = torch.FloatTensor([1, 1])
     print(bce(i, t))
+
+    def inv_sig(x):
+        return -torch.log((1 / x) - 1)
+
+    print(inv_sig(torch.tensor(1)))
+    print(inv_sig(torch.tensor(0)))
