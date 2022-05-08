@@ -26,8 +26,6 @@ class TargetTensor:
     def computeLossWith(self, preds: list, loss_fcn, debug=False):
 
         targets, d = self.tensor, torch.device(config.DEVICE)
-        TargetTensor.passTargetsToDevice(preds, d)
-        TargetTensor.passTargetsToDevice(targets, d)
 
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
@@ -64,8 +62,9 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Compute BBs from models predictions (iterating over all the scales)
+    # Anchors should be normalized, unscaled, torch.tensor type
     @staticmethod
-    def computeBoundingBoxesFromPreds(preds, anchors, thresh, nms=True):
+    def computeBoundingBoxesFromPreds(preds, anchors: torch.tensor, thresh, nms=True):
 
         batch_bboxes = [torch.tensor([], device=config.DEVICE) for _ in range(preds[0].shape[0])]
         for scale, pred_on_scale in enumerate(preds):
@@ -149,6 +148,7 @@ class TargetTensor:
     @staticmethod
     def convertPredsToBoundingBox(tensor: torch.tensor, anchors: torch.tensor):
 
+        tensor = tensor.clone()
         anchors = anchors.reshape(1, len(anchors), 1, 1, 2) 
         tensor[..., 0:3] = torch.sigmoid(tensor[..., 0:3])
         tensor[..., 3:5] = torch.exp(tensor[..., 3:5]) * anchors
