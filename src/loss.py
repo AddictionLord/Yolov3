@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 
 import config
-from utils import intersectionOverUnion, TargetTensor
+from utils import intersectionOverUnion, TargetTensor, iou
 
 
 '''
 https://towardsdatascience.com/calculating-loss-of-yolo-v3-layer-8878bfaaf1ff
 https://towardsdatascience.com/yolo-v3-explained-ff5b850390f
+https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9e3d2666280e
 
 '''
 
@@ -39,42 +40,56 @@ class Loss(nn.Module):
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
 
+        # ------------------------------------------------------
+        # BCE uses sigmoid inside!!!
         noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
 
+        # ------------------------------------------------------
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        ious = intersectionOverUnion(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+        obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+
+        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
+        # ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+        # obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+
+        # BAD - WE HAVE NOOBJ LOSS FOR THAT
+        # New approach, objectness computed for all cells, even without bb
+        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
+        # ious = intersectionOverUnion(preds[..., 1:5].reshape(-1, 4), target[..., 1:5].reshape(-1, 4))
+        # obj_loss = self.bce(preds[..., 0:1].reshape(-1, 1), ious * target[..., 0:1].reshape(-1, 1))
+        # obj_loss = self.bce(preds[..., 0:1].reshape(-1, 1), target[..., 0:1].reshape(-1, 1))
 
         # obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
         # print()
 
-        # loss when there is no object
-        # noobj_loss = self.bce(preds[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-
+        # ------------------------------------------------------
         # box coordinates loss
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         # target_wh_recomputed = torch.log(1e-8 + target[..., 3:5] / anchors)
         # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
 
+        # ------------------------------------------------------
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         # wh_loss = self.mse(preds[..., 3:5][Iobj], target[..., 3:5][Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
         box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
 
 
+        # ------------------------------------------------------
         # class loss
         class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
         
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
-        noobj_loss[torch.isnan(noobj_loss)]     = 0
+        # noobj_loss[torch.isnan(noobj_loss)]     = 0
         # obj_loss[torch.isnan(obj_loss)]         = 0
-        box_loss[torch.isnan(box_loss)]         = 0
-        class_loss[torch.isnan(class_loss)]     = 0
+        # box_loss[torch.isnan(box_loss)]         = 0
+        # class_loss[torch.isnan(class_loss)]     = 0
 
         if config.DEBUG or debug:
-            print('preds:\n', predictions[..., 0:1][Iobj])
+            print('\npreds:\n', preds[..., 0:1][Iobj])
             print('targets:\n', target[..., 0:1][Iobj])
 
             print(f'Object loss: {obj_loss}')
