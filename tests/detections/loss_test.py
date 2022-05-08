@@ -30,7 +30,7 @@ def testLossFcn(targets, preds, anchors: torch.tensor, loss_fcn):
         converted_target = target[..., torch.Tensor([5,0,1,2,3,4]).long()]
         print(f'Tensor on scale {scale} are identical: {torch.allclose(converted_target, converted_pred)}')
 
-    loss = targets.computeLossWith(preds, loss_fcn, debug=False)
+    loss = targets.computeLossWith(preds, loss_fcn, debug=True)
     print(loss)
 
 

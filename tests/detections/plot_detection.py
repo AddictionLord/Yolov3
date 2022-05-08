@@ -62,7 +62,7 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 if __name__ == "__main__":
 
     loader = getValLoader([6], False)
-    container = YoloTrainer.loadModel('bike6')
+    container = YoloTrainer.loadModel('bike6_pretrained')
     model = Yolov3(config.yolo_config)
     model.load_state_dict(container['model'])
     model = model.to(torch.float16).to(config.DEVICE)
