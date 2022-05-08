@@ -53,15 +53,16 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # BCE uses sigmoid inside!!!
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
-        # print(torch.allclose(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj]))
+        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
 
 
         # ------------------------------------------------------
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
+        obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        # obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
 
         # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         # ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
@@ -93,7 +94,8 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
+        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        # class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
         
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
         # noobj_loss[torch.isnan(noobj_loss)]     = 0
