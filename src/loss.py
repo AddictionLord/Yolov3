@@ -60,8 +60,10 @@ class Loss(nn.Module):
         # ------------------------------------------------------
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+        ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #s.detach()
         obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+
+        # obj_loss = self.mse(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         # obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
 
         # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
@@ -81,14 +83,12 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # box coordinates loss
+
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         # target_wh_recomputed = torch.log(1e-8 + target[..., 3:5] / anchors)
         # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
-        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
+        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]).requires_grad_(True))
 
-        # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
-        # wh_loss = self.mse(preds[..., 3:5][Iobj], target[..., 3:5][Iobj])
-        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]))
         box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
 
 
