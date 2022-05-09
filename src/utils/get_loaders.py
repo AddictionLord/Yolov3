@@ -75,7 +75,7 @@ def getValLoader(subset: list=None, loadbar=True):
         drop_last=False,
     )
 
-    return tqdm(val_loader) if loadbar else val_loader
+    return tqdm(val_loader, leave=False) if loadbar else val_loader
 
 
 # ------------------------------------------------------

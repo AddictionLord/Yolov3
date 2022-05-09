@@ -25,8 +25,7 @@ class TargetTensor:
     # Computes loss with another list of tensors with given loss fcn
     def computeLossWith(self, preds: list, loss_fcn, debug=False):
 
-        targets, d = self.tensor, torch.device(config.DEVICE)
-
+        targets = self.tensor
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
@@ -37,22 +36,12 @@ class TargetTensor:
 
 
     # ------------------------------------------------------
-    # Sets all tensors in target to specific device
-    @staticmethod
-    def passTargetsToDevice(targets: list, device: [str, torch.device]):
-
-        for tensor in targets:
-
-            tensor.to(device)
-
-
-    # ------------------------------------------------------
     # Used to create instance from different data than original constructor,
     # anchors sould be config.ANCHORS
     @classmethod
     def fromDataLoader(cls, anchors: list, targets: list):
 
-        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
+        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE).requires_grad_(True)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
         tt = cls(anchors, scales_cells)
         tt.tensor = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
