@@ -73,7 +73,7 @@ class YoloTrainer:
             # weight_decay=config.WEIGHT_DECAY
         )
         self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
-        
+
         if load:
             YoloTrainer.uploadParamsToModel(
                 net, 
@@ -81,6 +81,11 @@ class YoloTrainer:
                 self.optimizer, 
                 self.supervisor
             )
+
+        # # TODO: DELETE - Just for single use
+        # for g in self.optimizer.param_groups:
+        #     g['lr'] = config.LEARNING_RATE
+
 
         for epoch in range(config.NUM_OF_EPOCHS):
 
@@ -113,7 +118,7 @@ class YoloTrainer:
     def _validate(self, model: Yolov3):
 
         model.eval()
-        loader = tqdm(self.val_loader)
+        loader = self.val_loader
         for batch_id, (img, targets) in enumerate(self.val_loader):
 
             val_losses = list()
@@ -122,7 +127,7 @@ class YoloTrainer:
 
                 anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
                 preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(
-                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=True
+                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=False
                 )
                 targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
                 target_bboxes = targets.getBoundingBoxesFromDataloader(1)
@@ -144,16 +149,17 @@ class YoloTrainer:
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
         losses = list()
-        loader = tqdm(self.train_loader)
+        loader = self.train_loader
         for batch, (img, targets) in enumerate(loader):
 
+            optimizer.zero_grad()
+            model.zero_grad()
             targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
                 output = model(img.to(config.DEVICE))
                 loss = targets.computeLossWith(output, self.loss, debug=False)
 
             losses.append(loss.item())
-            optimizer.zero_grad()
 
             # AMP scaler, see docs. for more
             self.scaler.scale(loss).backward()
@@ -230,10 +236,10 @@ if __name__ == '__main__':
 
 
     # ------------------------------------------------------------
-    # t = YoloTrainer((getValLoader([6], False), getValLoader([6], False)))
-    t = YoloTrainer()
+    t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
+    # t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('gpu_fixed_loss')
+    container = YoloTrainer.loadModel('full_pretrained_overnight')
 
     try:
         t.trainYoloNet(container, load=True)
@@ -247,7 +253,7 @@ if __name__ == '__main__':
 
     finally:
         pass
-        YoloTrainer.saveModel("full_pretrained", t.model, t.optimizer, t.supervisor)
+        YoloTrainer.saveModel("batch", t.model, t.optimizer, t.supervisor)
 
 
 
