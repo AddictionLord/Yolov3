@@ -1,5 +1,8 @@
 import torch
-import torch.nn as nn
+from torch import nn
+# from torchvision.ops.focal_loss import sigmoid_focal_loss as focalLoss
+from thirdparty import FocalLoss
+from torch.nn.functional import one_hot
 
 import config
 from utils import intersectionOverUnion, TargetTensor, iou
@@ -14,12 +17,21 @@ https://towardsdatascience.com/dive-really-deep-into-yolo-v3-a-beginners-guide-9
 
 
 class Loss(nn.Module):
-    def __init__(self, testing=False):
+    def __init__(self, testing=False, class_weights=False):
         super().__init__()
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss(reduction='mean')
-        self.entropy = nn.CrossEntropyLoss()
         self.sigmoid = nn.Sigmoid()
+        
+        if class_weights:
+            self.entropy = nn.CrossEntropyLoss(weight=torch.tensor(config.CLASS_WEIGHTS).to(config.DEVICE))
+
+        else:
+            self.entropy = nn.CrossEntropyLoss()
+
+        self.bce2 = nn.BCEWithLogitsLoss(reduction='sum')
+        self.focalLoss = FocalLoss(self.bce2, reduction='sum')
+        
 
         # Values from Yolov1 paper
         self.lambda_box = config.LAMBDA_COORD #10
@@ -53,15 +65,18 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # BCE uses sigmoid inside!!!
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        noobj_loss = self.focalLoss(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+
         # noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
 
 
         # ------------------------------------------------------
         # loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #s.detach()
-        obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #.detach()
+        # obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
 
         # obj_loss = self.mse(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         # obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
@@ -83,18 +98,26 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # box coordinates loss
+        # box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+
+        box_loss = (1 - ious).mean()
 
         # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
         # target_wh_recomputed = torch.log(1e-8 + target[..., 3:5] / anchors)
         # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
         # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]).requires_grad_(True))
 
-        box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
 
 
         # ------------------------------------------------------
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        # class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+
+
+        oh = one_hot(target[..., 5][Iobj].long(), num_classes=6)
+        class_loss = self.focalLoss(predictions[..., 5:][Iobj], oh)
+
+        # class_loss = focalLoss(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
         # class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
         
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
@@ -155,8 +178,8 @@ def getOptimalTargetAndPreds():
 if __name__ == "__main__":
 
 
-    # def sig(x):
-    #     return 1 / (1 + torch.exp(torch.tensor(-x)))
+    def sig(x):
+        return 1 / (1 + torch.exp(torch.tensor(-x)))
 
     # def inv_sig(x):
     #     return -torch.log((1 / x) - 1)
@@ -196,13 +219,16 @@ if __name__ == "__main__":
 
     # print(cnt)
 
-    bce = nn.BCEWithLogitsLoss()
-    i = torch.FloatTensor([torch.inf, torch.inf]).clip(min=1e-16, max=1e+16)
-    t = torch.FloatTensor([1, 1])
-    print(bce(i, t))
+    # bce = nn.BCEWithLogitsLoss()
+    # i = torch.FloatTensor([torch.inf, torch.inf]).clip(min=1e-16, max=1e+16)
+    # t = torch.FloatTensor([1, 1])
+    # print(bce(i, t))
 
-    def inv_sig(x):
-        return -torch.log((1 / x) - 1)
+    # def inv_sig(x):
+    #     return -torch.log((1 / x) - 1)
 
-    print(inv_sig(torch.tensor(1)))
-    print(inv_sig(torch.tensor(0)))
+    # print(inv_sig(torch.tensor(1)))
+    # print(inv_sig(torch.tensor(0)))
+
+    # loss = focalLoss(inputs, targets)
+

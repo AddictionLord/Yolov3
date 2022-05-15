@@ -16,15 +16,20 @@ DEBUG = False
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
 NUM_WORKERS = 4
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
 WEIGHT_DECAY = 1e-3
 
 # Loss constants
-LAMBDA_COORD = 10 #10
-LAMBDA_NOOBJ = 20 #10
+# LAMBDA_COORD = 20 #10
+# LAMBDA_NOOBJ = 20 #10
+# LAMBDA_OBJ = 5
+# LAMBDA_CLASS = 5
+
+LAMBDA_COORD = 100 #10
+LAMBDA_NOOBJ = 3 #10
 LAMBDA_OBJ = 5
 LAMBDA_CLASS = 5
 
@@ -157,6 +162,15 @@ darknet_config = [
 
 # ------------------------------------------------------
 # Modified MSCoco dataset labels
+CLASS_WEIGHTS = [
+    1.5597217456405777e-05, # 'person',
+    0.0003075030750307503, # 'bicycle',
+    8.162598971512529e-05, # 'car',
+    0.00028555111364934324, # 'motorcycle',
+    0.00022805017103762827, # 'dog',
+    0.00025303643724696357# 'bus'
+]
+
 LABELS = [
  'person',
  'bicycle',
