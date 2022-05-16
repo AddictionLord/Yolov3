@@ -45,10 +45,12 @@ Saving and loading models:
 '''
 
 
+ 
+# ------------------------------------------------------
 class YoloTrainer:
     def __init__(self, loaders=getLoaders()):
 
-        self.loss = Loss()
+        self.loss = Loss(class_weights=True)
 
         self.train_loader, self.val_loader = loaders
         # self.train_loader, self.val_loader = getValLoader([2], False), getValLoader([2], False) 
@@ -67,8 +69,11 @@ class YoloTrainer:
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
         self.model = Yolov3(net['architecture'], pretrained=True)
         self.model = self.model.to(config.DEVICE)
+        # self.model.darknet.evaluate()
+        # self.model.darknet.eval()
         self.optimizer = RAdam(
-            self.model.parameters(), 
+            self.model.yolo.parameters(), 
+            # self.model.parameters(), 
             config.LEARNING_RATE, 
             # weight_decay=config.WEIGHT_DECAY
         )
@@ -79,19 +84,22 @@ class YoloTrainer:
                 net, 
                 self.model, 
                 self.optimizer, 
-                self.supervisor
+                supervisor=self.supervisor
             )
 
-        # # TODO: DELETE - Just for single use
+        # self.model.yolo.apply(Yolov3.focalWeights)
+
+
+        # TODO: DELETE - Just for single use
         # for g in self.optimizer.param_groups:
-        #     g['lr'] = config.LEARNING_RATE
+        #     g['lr'] = 0.001
 
 
         for epoch in range(config.NUM_OF_EPOCHS):
 
             loss = self._train(self.model, self.optimizer)
 
-            if epoch % 10 == 0 and epoch != 0:
+            if epoch % 5 == 0 and epoch != 0:
                 val_loss = self._validate(self.model)
                 print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
                 mAP = self.supervisor.update(loss)
@@ -117,17 +125,18 @@ class YoloTrainer:
     # ------------------------------------------------------
     def _validate(self, model: Yolov3):
 
-        model.eval()
-        loader = self.val_loader
-        for batch_id, (img, targets) in enumerate(self.val_loader):
+        model.darknet.eval()
+        model.yolo.eval()
+        val_losses = list()
+        loader = tqdm(self.val_loader)
+        for batch_id, (img, targets) in enumerate(loader):
 
-            val_losses = list()
             with torch.no_grad():
                 preds = model(img.to(config.DEVICE).to(torch.float32))
 
                 anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
                 preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(
-                    copy.deepcopy(preds), anchors, config.PROBABILITY_THRESHOLD, nms=False
+                    copy.deepcopy(preds), anchors, thresh=0.49, nms=True
                 )
                 targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
                 target_bboxes = targets.getBoundingBoxesFromDataloader(1)
@@ -140,7 +149,7 @@ class YoloTrainer:
 
                 loader.set_postfix(loss=val_loss.item(), mean_loss=running_mean)
 
-        model.train()
+        model.yolo.train()
         self.supervisor.val_loss = running_mean
         return running_mean
 
@@ -149,7 +158,7 @@ class YoloTrainer:
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
         losses = list()
-        loader = self.train_loader
+        loader = tqdm(self.train_loader)
         for batch, (img, targets) in enumerate(loader):
 
             optimizer.zero_grad()
@@ -231,15 +240,15 @@ class YoloTrainer:
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-    from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
+    # from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
 
 
 
     # ------------------------------------------------------------
-    t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
-    # t = YoloTrainer()
+    # t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
+    t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('full_pretrained_overnight')
+    container = YoloTrainer.loadModel('ultralytics_focal_loss_continuing')
 
     try:
         t.trainYoloNet(container, load=True)
@@ -253,14 +262,19 @@ if __name__ == '__main__':
 
     finally:
         pass
-        YoloTrainer.saveModel("batch", t.model, t.optimizer, t.supervisor)
+        YoloTrainer.saveModel("ultralytics_focal_loss_continuing", t.model, t.optimizer, t.supervisor)
 
 
 
 
     # ------------------------------------------------------------
+    # # t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
     # t = YoloTrainer()
     # container = {'architecture': config.yolo_config}
-    # container = YoloTrainer.loadModel('gpu')
 
+    # container = YoloTrainer.loadModel('ultralytics_focal_loss_box')
     # t.trainYoloNet(container, load=True)
+    
+    # # t.trainYoloNet(container)
+
+
