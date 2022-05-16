@@ -2,6 +2,11 @@ import torch
 from torch import nn
 import numpy as np
 
+import sys
+sys.path.insert(1, '/home/s200640/thesis/src/')
+
+# from blocks.scale_prediction_block import ScalePrediction
+
 
 '''
 Loading weights from PJ Redmon's darknet53.conv.74 file
@@ -55,5 +60,9 @@ class WeightsHandler:
 
         elif isinstance(layer, nn.BatchNorm2d):
             # nn.init.kaiming_uniform_(layer.weight, a=0.1)
-            layer.weight.data.fill_(1)
-            nn.init.zeros_(layer.bias) 
+            layer.weight.data.fill_(1) if layer.affine else None
+            nn.init.zeros_(layer.bias) if layer.affine else None
+
+        # elif isinstance(layer, ScalePrediction):
+
+        #     print('\n\nScale')
