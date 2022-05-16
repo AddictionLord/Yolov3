@@ -10,7 +10,7 @@ from utils import WeightsHandler
 
 
 class CNNBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, batch_norm=True, **kwargs):
+    def __init__(self, in_channels: int, out_channels: int, batch_norm=True, fine_tune=False, **kwargs):
         super(CNNBlock, self).__init__()
 
         self.batch_norm = batch_norm
@@ -19,7 +19,7 @@ class CNNBlock(nn.Module):
             # In this case bias=False -> no bias to learn/load
             self.block = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, bias=False, **kwargs),
-                nn.BatchNorm2d(out_channels),
+                nn.BatchNorm2d(out_channels).eval() if fine_tune else nn.BatchNorm2d(out_channels),
                 nn.LeakyReLU(0.1)
             )
             
@@ -60,19 +60,30 @@ class CNNBlock(nn.Module):
 
             elif isinstance(layer, nn.BatchNorm2d):
                 # number of params are same for biases, weights, means and vars
-                num_of_parameters = layer.bias.numel()
+
+                num_of_parameters = layer.bias.numel() if layer.affine else layer.running_mean.numel()
 
                 bn_biases = weights.getValues(num_of_parameters)
-                layer.bias.data.copy_(bn_biases.view_as(layer.bias.data))
+                layer.bias.data.copy_(bn_biases.view_as(layer.bias.data)) if layer.affine else None
 
                 bn_weights = weights.getValues(num_of_parameters)
-                layer.weight.data.copy_(bn_weights.view_as(layer.weight.data))
+                layer.weight.data.copy_(bn_weights.view_as(layer.weight.data)) if layer.affine else None
 
                 bn_run_means = weights.getValues(num_of_parameters)
-                layer.running_mean.data.copy_(bn_run_means.view_as(layer.running_mean.data))
+                layer.running_mean.data.copy_(bn_run_means.view_as(layer.running_mean.data)) if layer.track_running_stats else None
 
                 bn_run_vars = weights.getValues(num_of_parameters)
-                layer.running_var.data.copy_(bn_run_vars.view_as(layer.running_var.data))
+                layer.running_var.data.copy_(bn_run_vars.view_as(layer.running_var.data)) if layer.track_running_stats else None
+
+    
+    # ------------------------------------------------------
+    # Set BatchNorm2D layer to eval mode to fine tune
+    def setBatchNormToEval(self):
+
+        for layer in self.block:
+
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.eval()
 
 
 
