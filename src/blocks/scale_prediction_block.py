@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
-from blocks import CNNBlock
+sys.path.insert(1, '/home/s200640/thesis/src/')
+from blocks.cnn_block import CNNBlock
 
 
 
