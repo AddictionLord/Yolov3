@@ -85,15 +85,44 @@ class Visualizer:
 
 
     # ------------------------------------------------------
+    def viewRecall(self, plot=True):
+
+        mAP = self.data.drop('learning_rate', axis=1)
+        mAP = mAP.drop('val_loss', axis=1)
+        mAP = mAP.drop('loss', axis=1)
+        mAP = mAP.drop('epoch', axis=1)
+        mAP = mAP.drop('map', axis=1)
+        mAP = mAP.drop('map_50', axis=1)
+        mAP = mAP.drop('map_75', axis=1)
+        mAP = mAP.drop('map_large', axis=1)
+
+        print(mAP)
+
+        if plot:
+
+            mAP.plot()
+            plt.grid()
+            plt.xlabel('epochs')
+            plt.ylabel('accuracy')
+
+            plt.show()
+
+        return mAP
+
+
+
+    # ------------------------------------------------------
     def overview(self):
 
         loss = self.viewLoss(plot=False)
         mAP = self.viewPrecision(plot=False)
+        mAR = self.viewRecall(plot=False)
 
-        fig, axes = plt.subplots(nrows=2, ncols=1)
+        fig, axes = plt.subplots(nrows=3, ncols=1)
 
         loss.plot(ax=axes[0])
         mAP.plot(ax=axes[1])
+        mAR.plot(ax=axes[2])
 
         plt.show()
 
@@ -103,7 +132,12 @@ class Visualizer:
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    v = Visualizer('full_pretrained_overnight')
+    # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # v = Visualizer('transfer_learning_darknet_eval')
+    v = Visualizer('ultralytics_focal_loss_checkpoint')
+    # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # v = Visualizer('overfit_checkpoint')
+    
     
     # v.viewLoss()
     # v.viewAccuracy()
