@@ -62,21 +62,26 @@ class Loss(nn.Module):
         Inoobj = target[..., 0] == 0
         # d = torch.ones(target[..., 0].shape).to(config.DEVICE) - Iobj.float()
 
-
         # ------------------------------------------------------
         # BCE uses sigmoid inside!!!
         noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-        # noobj_loss = self.focalLoss(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # noobj_loss = self.focalLoss(predictions[..., 0:1][Inoobj].clip(min=-10e+6, max=10e+6), target[..., 0:1][Inoobj])
 
         # noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
 
 
         # ------------------------------------------------------
         # loss when there is object
+        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
+        # ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #.detach()
+        # # obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        # obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #.detach()
-        obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-        # obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        # obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
+        # obj_loss = self.focalLoss(predictions[..., 0:1][Iobj].clip(min=-10e+6, max=10e+6), ious * target[..., 0:1][Iobj])
 
         # obj_loss = self.mse(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         # obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
@@ -111,10 +116,10 @@ class Loss(nn.Module):
 
         # ------------------------------------------------------
         # class loss
-        class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        # class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
 
-        # oh = one_hot(target[..., 5][Iobj].long(), num_classes=6)
-        # class_loss = self.focalLoss(predictions[..., 5:][Iobj], oh)
+        oh = one_hot(target[..., 5][Iobj].long(), num_classes=6)
+        class_loss = self.focalLoss(predictions[..., 5:][Iobj], oh)
 
         # class_loss = focalLoss(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
         # class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
@@ -129,6 +134,7 @@ class Loss(nn.Module):
             # print('\npreds:\n', preds[..., 0:1][Iobj])
             # print('targets:\n', target[..., 0:1][Iobj])
 
+            print()
             print(f'Object loss: {obj_loss}')
             print(f'No object loss: {noobj_loss}')
             print(f'Class loss: {class_loss}')
@@ -139,7 +145,7 @@ class Loss(nn.Module):
             + self.lambda_obj * obj_loss
             + self.lambda_noobj * noobj_loss
             + self.lambda_class * class_loss
-        )
+        ).to(torch.float16)
 
 
 

@@ -134,6 +134,7 @@ if __name__ == "__main__":
 
     # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
     # v = Visualizer('transfer_learning_darknet_eval')
+    # v = Visualizer('ultralytics_focal_loss')
     v = Visualizer('ultralytics_focal_loss_checkpoint')
     # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
     # v = Visualizer('overfit_checkpoint')

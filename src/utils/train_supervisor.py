@@ -94,14 +94,14 @@ class TrainSupervisor:
             self.mAP_dict = self.mAP.compute()
             self.mAP.reset()
             # self.scheduler.step(self.mAP_dict["map"])
-            self.scheduler.step(self.val_loss)
+            # self.scheduler.step(self.val_loss)
             self.mAP._update_called = False
 
         mAP = self.mAP_dict if isinstance(self.mAP_dict, dict) else [np.nan for _ in range(8)]
         self.updateDataFrame(mAP, loss, self.val_loss)
 
         return mAP["map"] if isinstance(mAP, dict) else - np.inf
-        
+
 
     # ------------------------------------------------------
     # Creates new index in dataFrame with passed values

@@ -61,17 +61,68 @@ class YoloTrainer:
         self.model = None
         self.optimizer = None
 
+
+    # ------------------------------------------------------
+    def trainNet(self, model, optimizer, load=False, net=None):
+
+        print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
+        self.model = model.to(config.DEVICE)
+        self.optimizer = optimizer
+
+        # self.model.yolo.apply(Yolov3.focalWeights)
+        # self.model.darknet.evaluate()
+        # self.model.darknet.eval()
+
+        self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
+
+        if load:
+            YoloTrainer.uploadParamsToModel(
+                load, self.model, supervisor=self.supervisor
+            )
+
+        # self.model.yolo.apply(Yolov3.focalWeights)
+        
+        # self.optimizer.add_param_group({'params': self.model.darknet.parameters()})
+        # print(self.optimizer.param_groups)
+
+        for epoch in range(config.NUM_OF_EPOCHS):
+
+            loss = self._train(self.model, self.optimizer)
+
+            if epoch % config.EVAL_EPOCH == 0 and epoch != 0:
+                val_loss = self._validate(self.model)
+                print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
+                mAP = self.supervisor.update(loss)
+                print(self.supervisor.data[[
+                    'epoch', 'learning_rate', 'loss', 'val_loss', 'map', 'map_50', 'map_75'
+                ]].tail(1))
+
+            else:
+                mAP = self.supervisor.update(loss)
+
+            if mAP > self.supervisor.best_mAP:
+                self.supervisor.best_mAP = mAP
+                YoloTrainer.saveModel(
+                    f'{self.supervisor.name}_checkpoint', 
+                    self.model, 
+                    self.optimizer, 
+                    self.supervisor
+                )
+            
+        return self.model, self.optimizer
+
+
     
     # ------------------------------------------------------
     # Method to train specific Yolo architecture and return model + optimizer
-    def trainYoloNet(self, net: dict, load: bool=False):
+    def trainYoloNet(self, net: dict, load: bool=False, optimizer=None):
 
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
         self.model = Yolov3(net['architecture'], pretrained=True)
         self.model = self.model.to(config.DEVICE)
         # self.model.darknet.evaluate()
         # self.model.darknet.eval()
-        self.optimizer = RAdam(
+        self.optimizer = Adam(
             self.model.yolo.parameters(), 
             # self.model.parameters(), 
             config.LEARNING_RATE, 
@@ -248,7 +299,7 @@ if __name__ == '__main__':
     # t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('ultralytics_focal_loss_continuing')
+    container = YoloTrainer.loadModel('uflc_config_mod')
 
     try:
         t.trainYoloNet(container, load=True)
@@ -262,7 +313,7 @@ if __name__ == '__main__':
 
     finally:
         pass
-        YoloTrainer.saveModel("ultralytics_focal_loss_continuing", t.model, t.optimizer, t.supervisor)
+        YoloTrainer.saveModel("uflc_config_mod", t.model, t.optimizer, t.supervisor)
 
 
 
