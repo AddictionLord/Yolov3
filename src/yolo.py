@@ -86,23 +86,21 @@ class Yolov3(nn.Module, CNNBuilder):
         return outputs
 
     
-    # ------------------------------------------------------
-    # Switches model to train mode except BatchNorm2D layers
-    def fineTuningTrainMode(self):
+    # # ------------------------------------------------------
+    # # Switches model to train mode except BatchNorm2D layers
+    # def fineTuningTrainModel(self):
 
-        self.yolo.train()
-        for block in self.yolo:
+    #     self.yolo.train()
+    #     for block in self.yolo:
 
-            if isinstance(block, CNNBlock):
-                pass
+    #         if isinstance(block, CNNBlock):
+    #             pass
 
-            elif isinstance(block, ResidualBlock):
-                pass
-                # layer = self._buildResidualLayer(in_channels, block)
+    #         elif isinstance(block, ResidualBlock):
+    #             pass
 
-            elif isinstance(block, ScalePrediction):
-                pass
-                # layer = self._buildScalePredictionLayer(in_channels, self.num_of_classes)
+    #         elif isinstance(block, ScalePrediction):
+    #             pass
 
 
     # ------------------------------------------------------
