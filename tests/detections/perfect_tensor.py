@@ -1,6 +1,7 @@
 import torch
 import sys
 sys.path.insert(1, '/home/s200640/thesis/src/')
+import copy
 
 import config 
 from utils import getValLoader, TargetTensor
@@ -24,9 +25,9 @@ def createPerfectPredictionTensor(loader, anchors):
 
     else:
         image, targets = next(iter(loader))
-        targets = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
+        targets = [target.detach().clone().requires_grad_(False).to(config.DEVICE) for target in targets]
 
-    preds = targets.copy()
+    preds = [torch.zeros_like(i, device=config.DEVICE) for i in targets]
     for scale, target in enumerate(targets):
 
         # plot_image(image[0].permute(1,2,0).detach().cpu())
@@ -105,6 +106,12 @@ if __name__ == '__main__':
 
         targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
         createPerfectPredictionTensor(targets.tensor, anchors)
+
+
+
+    # preds, image = createPerfectPredictionTensor(val_loader, anchors)
+    # plotDetections(model, image.to(device), config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, anchors, preds)
+
 
 #%%
 import torch

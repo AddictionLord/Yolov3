@@ -61,11 +61,13 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
 
 if __name__ == "__main__":
 
-    loader = getValLoader([25, 30, 35, 40, 45], False)
+    loader = getValLoader([i for i in range(400, 420)], False)
+    # loader = getValLoader(loadbar=False)
     # loader = getValLoader(loadbar=False)
     # container = YoloTrainer.loadModel('finetune_with_darknet')
     # container = YoloTrainer.loadModel('ultralytics_focal_loss_focal_loss_box')
-    container = YoloTrainer.loadModel('overfit_again')
+    # container = YoloTrainer.loadModel('optim_RMSprop_checkpoint')
+    container = YoloTrainer.loadModel('bleee_checkpoint_checkpoint')
     
     model = Yolov3(config.yolo_config)
     model.load_state_dict(container['model'])
