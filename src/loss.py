@@ -58,78 +58,53 @@ class Loss(nn.Module):
     def forward(self, predictions, target, anchors, debug=False):
 
         # ------------------------------------------------------
+        # Creating mask for cell with objects and for background cells
+        
         Iobj = target[..., 0] == 1
         Inoobj = target[..., 0] == 0
-        # d = torch.ones(target[..., 0].shape).to(config.DEVICE) - Iobj.float()
+
 
         # ------------------------------------------------------
         # BCE uses sigmoid inside!!!
-        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
-        # noobj_loss = self.focalLoss(predictions[..., 0:1][Inoobj].clip(min=-10e+6, max=10e+6), target[..., 0:1][Inoobj])
 
-        # noobj_loss = self.bce(predictions[..., 0:1][Inoobj].clip(min=-1e+16), target[..., 0:1][Inoobj])
+        noobj_loss = self.bce(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
+        # noobj_loss = self.focalLoss(predictions[..., 0:1][Inoobj], target[..., 0:1][Inoobj])
 
 
         # ------------------------------------------------------
-        # loss when there is object
-        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        # ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #.detach()
-        # # obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-        # obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-
+        # Loss when there is object
         preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
         ious = self.iou_fcn(preds[..., 1:5][Iobj], target[..., 1:5][Iobj]) #.detach()
+
         # obj_loss = self.bce(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
         obj_loss = self.focalLoss(predictions[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-        # obj_loss = self.focalLoss(predictions[..., 0:1][Iobj].clip(min=-10e+6, max=10e+6), ious * target[..., 0:1][Iobj])
-
-        # obj_loss = self.mse(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-        # obj_loss = self.bce(predictions[..., 0:1][Iobj].clip(max=1e+16), ious * target[..., 0:1][Iobj])
-
-        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        # ious = iou(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
-        # obj_loss = self.bce(preds[..., 0:1][Iobj], ious * target[..., 0:1][Iobj])
-
-        # BAD - WE HAVE NOOBJ LOSS FOR THAT
-        # New approach, objectness computed for all cells, even without bb
-        # preds, anchors = TargetTensor.convertPredsToBoundingBox(predictions, anchors.clone())
-        # ious = intersectionOverUnion(preds[..., 1:5].reshape(-1, 4), target[..., 1:5].reshape(-1, 4))
-        # obj_loss = self.bce(preds[..., 0:1].reshape(-1, 1), ious * target[..., 0:1].reshape(-1, 1))
-        # obj_loss = self.bce(preds[..., 0:1].reshape(-1, 1), target[..., 0:1].reshape(-1, 1))
-
-        # obj_loss = self.bce(predictions[..., 0:1][Iobj], target[..., 0:1][Iobj])
-        # print()
-
+       
 
         # ------------------------------------------------------
-        # box coordinates loss
-        # box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
+        # Box coordinates loss
 
+        # box_loss = self.mse(preds[..., 1:5][Iobj], target[..., 1:5][Iobj])
         box_loss = (1 - ious).mean()
 
-        # xy_loss = self.mse(preds[..., 1:3][Iobj], target[..., 1:3][Iobj])
-        # target_wh_recomputed = torch.log(1e-8 + target[..., 3:5] / anchors)
-        # wh_loss = self.mse(predictions[..., 3:5][Iobj], target_wh_recomputed[Iobj])
-        # box_loss = torch.mean(torch.tensor([xy_loss, wh_loss]).requires_grad_(True))
-
-
 
         # ------------------------------------------------------
-        # class loss
-        # class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
+        # Class loss
 
+        # class_loss = self.entropy(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
         oh = one_hot(target[..., 5][Iobj].long(), num_classes=6)
         class_loss = self.focalLoss(predictions[..., 5:][Iobj], oh)
+  
 
-        # class_loss = focalLoss(predictions[..., 5:][Iobj], target[..., 5][Iobj].long())
-        # class_loss = self.entropy(predictions[..., 5:][Iobj].clip(max=1e+16), target[..., 5][Iobj].long())
-        
+        # ------------------------------------------------------
         # Convert nan values to 0, torch.nan_to_num not available in dev torhc version
+
         # noobj_loss[torch.isnan(noobj_loss)]     = 0
         # obj_loss[torch.isnan(obj_loss)]         = 0
         # box_loss[torch.isnan(box_loss)]         = 0
         # class_loss[torch.isnan(class_loss)]     = 0
 
+
+        # ------------------------------------------------------
         if config.DEBUG or debug:
             # print('\npreds:\n', preds[..., 0:1][Iobj])
             # print('targets:\n', target[..., 0:1][Iobj])
@@ -139,6 +114,7 @@ class Loss(nn.Module):
             print(f'No object loss: {noobj_loss}')
             print(f'Class loss: {class_loss}')
             print(f'Box loss: {box_loss}')
+
 
         # loss fcn
         return (self.lambda_box * box_loss 

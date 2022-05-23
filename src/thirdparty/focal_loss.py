@@ -3,7 +3,12 @@ from torch import nn
 # from nn.functional.F import softmax, one_hot
 
 
+'''
+THIRD PARTY package, sources:
 
+[Ultralytics]: 
+    https://github.com/ultralytics/yolov3/blob/master/utils/loss.py
+'''
 
 # --------------------------------------------------------------
 class FocalLoss(nn.Module):
