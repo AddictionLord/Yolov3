@@ -12,6 +12,8 @@ class Visualizer:
         self.path = f'./models/train_data/{filename}.pkl'
         self.data = pd.read_pickle(self.path)
 
+        # self.data = self.data.iloc[:700]
+        # self.data = self.data.iloc[680:740]
         print(f'[VISUALIZER]: Opening file ./models/train_data/{filename}.pkl')
         # print(data)
 
@@ -120,9 +122,14 @@ class Visualizer:
 
         fig, axes = plt.subplots(nrows=3, ncols=1)
 
-        loss.plot(ax=axes[0])
+        loss.plot(ax=axes[0]).set_ylim(top=500 if loss['loss'].max() > 500 else loss['loss'].max() + 50)
+        # axes[0].ylim(top=500)
         mAP.plot(ax=axes[1])
         mAR.plot(ax=axes[2])
+
+        for ax in axes:
+            
+            ax.grid(color='#95a5a6', linestyle='--', linewidth=0.5, axis='y', alpha=0.8)
 
         plt.show()
 
@@ -132,14 +139,41 @@ class Visualizer:
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
-    # v = Visualizer('transfer_learning_darknet_eval')
+    # # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # # # v = Visualizer('transfer_learning_darknet_eval')
     # v = Visualizer('ultralytics_focal_loss')
-    v = Visualizer('ultralytics_focal_loss_checkpoint')
-    # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
-    # v = Visualizer('overfit_checkpoint')
+    # # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # # # v = Visualizer('overfit_checkpoint')
+
+    # v = Visualizer('optim_Adam')
+    # # # v = Visualizer('optim_RMS_continue_checkpoint')
+    v = Visualizer('yolo_model')
     
     
-    # v.viewLoss()
-    # v.viewAccuracy()
+    # # # v.viewLoss()
+    # # # v.viewAccuracy()
     v.overview()
+
+    # optims = [
+    #     'optim_Adam_better',
+    #     'optim_Adagrad',
+    #     'optim_Adadelta',
+    #     'optim_SGD',
+    #     'optim_RMSprop'
+    # ]
+
+    # fig, ax = plt.subplots()
+
+    # for opt in optims:
+
+    #     v = Visualizer(opt)
+    #     mAP = v.viewPrecision(False)
+    #     mAP = mAP.drop('map_50', axis=1)
+    #     mAP = mAP.drop('map_75', axis=1)
+    #     mAP = mAP.drop('map_large', axis=1)
+    #     mAP.rename(columns={'map': f'mAP_{opt}'}, inplace=True)
+    #     mAP.plot(ax=ax)
+
+    # plt.show()
+
+
