@@ -17,8 +17,6 @@ from thirdparty import plot_image
 from utils import (
     getLoaders, getValLoader,
     TargetTensor, 
-    getBboxesToEvaluate, 
-    convertDataToMAP,
     TrainSupervisor
 )
 
