@@ -12,7 +12,7 @@ from yolo import Yolov3
 from yolo_trainer import YoloTrainer
 
 from dataset import Dataset
-from utils import TargetTensor, getValLoader, convertDataToMAP
+from utils import TargetTensor, getValLoader, TrainSupervisor
 from thirdparty import plot_image
 from perfect_tensor import createPerfectPredictionTensor
 
@@ -47,7 +47,7 @@ def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
     target_bboxes = targets.getBoundingBoxesFromDataloader(1)
     for batch_img_id, (bpreds, btargets) in enumerate(zip(pred_bboxes, target_bboxes)):
 
-        pdict, tdict = convertDataToMAP(bpreds, btargets)
+        pdict, tdict = TrainSupervisor._convertDataToMAP(bpreds, btargets)
         mAP.update(pdict, tdict)
         pprint(mAP.compute())
         mAP.reset()
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # container = YoloTrainer.loadModel('finetune_with_darknet')
     # container = YoloTrainer.loadModel('ultralytics_focal_loss_focal_loss_box')
     # container = YoloTrainer.loadModel('optim_RMSprop_checkpoint')
-    container = YoloTrainer.loadModel('bleee_checkpoint_checkpoint')
+    container = YoloTrainer.loadModel('yolo_model')
     
     model = Yolov3(config.yolo_config)
     model.load_state_dict(container['model'])
