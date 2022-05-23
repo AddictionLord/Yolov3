@@ -1,9 +1,10 @@
-dataset/balanced/
-dataset/train2017/
-dataset/val2017/
+dataset/balanced
+dataset/train2017
+dataset/val2017
 dataset/instances_train2017.json
 dataset/instances_val2017.json
 
+dataset/
 models/
 __pycache__/
 .vscode/
