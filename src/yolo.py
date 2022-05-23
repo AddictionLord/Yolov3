@@ -2,8 +2,15 @@ import torch
 import torch.nn as nn
 
 from darknet import Darknet
-from blocks.scale_prediction_block import ScalePrediction
-from blocks.cnn_builder import CNNBuilder
+# from blocks.scale_prediction_block import ScalePrediction
+from blocks.cnn_builder import (
+    CNNBuilder,
+    CNNBlock,
+    ResidualBlock,
+    ScalePrediction
+)
+
+from utils import WeightsHandler
 
 
 
@@ -17,7 +24,7 @@ architecture inspirations:
 
 '''
 
-config = [
+yolo_config = [
     # Darknet-53 before yolo
     (512, 1, 1),
     (1024, 3, 1),
@@ -42,15 +49,18 @@ config = [
 
 
 class Yolov3(nn.Module, CNNBuilder):
-    def __init__(self, config: list, in_channels=3, num_of_classes=6):
+    def __init__(self, yolo_config: list, in_channels=3, num_of_classes=6, pretrained=True):
         super(Yolov3, self).__init__()
 
-        self.config = config
+        self.config = yolo_config
         self.in_channels = in_channels
         self.num_of_classes = num_of_classes
 
-        self.darknet = Darknet(in_channels, pretrained=True)
-        self.yolo = self._constructNeuralNetwork(config, self.darknet.out_channels)
+        self.darknet = Darknet(in_channels, pretrained=pretrained)
+        # self.darknet.eval()
+        self.yolo = self._constructNeuralNetwork(yolo_config, self.darknet.out_channels)
+        self.yolo.apply(WeightsHandler.initWeights)
+        # self.yolo.apply(Yolov3.focalWeights)
 
 
     # ------------------------------------------------------
@@ -75,6 +85,34 @@ class Yolov3(nn.Module, CNNBuilder):
 
         return outputs
 
+    
+    # # ------------------------------------------------------
+    # # Switches model to train mode except BatchNorm2D layers
+    # def fineTuningTrainModel(self):
+
+    #     self.yolo.train()
+    #     for block in self.yolo:
+
+    #         if isinstance(block, CNNBlock):
+    #             pass
+
+    #         elif isinstance(block, ResidualBlock):
+    #             pass
+
+    #         elif isinstance(block, ScalePrediction):
+    #             pass
+
+
+    # ------------------------------------------------------
+    # Initialize weights for last layer to fit focalLoss
+    @staticmethod
+    def focalWeights(layer):
+
+        if isinstance(layer, ScalePrediction):
+
+            print(layer.block[1].block[0].bias)
+            layer.block[1].block[0].bias.data.fill_(-2)
+            print(layer.block[1].block[0].bias)
 
 
 # ------------------------------------------------------
@@ -85,7 +123,7 @@ def showYoloBlocks():
     from blocks.cnn_block import CNNBlock
     from blocks.residual_block import ResidualBlock
 
-    y = Yolov3(config)
+    y = Yolov3(yolo_config)
     num_of_blocks = len(y.yolo)
     print(f'Number of blocks: {num_of_blocks}')
 
@@ -94,10 +132,11 @@ def showYoloBlocks():
         print(type(block))
 
 
+# ------------------------------------------------------
 def testYoloOutputSize():
 
-    num_of_classes = 6
-    model = Yolov3(config, 3, num_of_classes)
+    NUM_OF_CLASSES = 6
+    model = Yolov3(yolo_config, 3, NUM_OF_CLASSES)
 
     BATCH_SIZE = 1
     INPUT_WIDTH = 256
@@ -116,6 +155,16 @@ def testYoloOutputSize():
     print(f'Output shape of scale 2: {out[2].shape}')
 
 
+# ------------------------------------------------------
+def testEvalMode():
+
+    y = Yolov3(yolo_config)
+    print(f'Training: {y.darknet.training}')
+    y.yolo.train()    
+    print(f'Training after train: {y.darknet.training}')
+    y.yolo.eval()    
+    print(f'Training after eval: {y.darknet.training}')
+
 
 
 # ------------------------------------------------------
@@ -124,6 +173,13 @@ def testYoloOutputSize():
 if __name__ == "__main__":
 
     # showYoloBlocks()
-    testYoloOutputSize()
+    # testYoloOutputSize()
+    # testEvalMode()
+
+    y = Yolov3(yolo_config)
+    # y.fineTuningTrainMode()
+
+    t = torch.rand(1, 3, 255, 255, requires_grad=True)
+    out = y(t)
 
 

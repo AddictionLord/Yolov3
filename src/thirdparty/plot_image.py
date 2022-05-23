@@ -3,6 +3,7 @@ import matplotlib.patches as patches
 import numpy as np
 from PIL import Image, ImageFile
 import sys
+import torch
 
 sys.path.insert(1, '/home/s200640/thesis/src/')
 import config
@@ -78,10 +79,13 @@ if __name__ == '__main__':
     val_img = config.val_imgs_path
     val_annots = config.val_annots_path
 
+    indice = 6
     d = Dataset(val_img, val_annots, anchors, transform=transform)
-    img, targets = d[21]
-    print(len(targets))
-    print(targets[0].unsqueeze(0).shape)
-    plot_image(img.permute(1, 2, 0).to('cpu'))
+    subset = torch.utils.data.Subset(d, list([indice]))
+    loader = torch.utils.data.DataLoader(subset, batch_size=1, num_workers=1, shuffle=False)
+
+    for img, tar in loader:
+
+        plot_image(img[0].permute(1, 2, 0).to('cpu'))
 
 

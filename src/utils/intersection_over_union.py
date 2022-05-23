@@ -1,9 +1,10 @@
 import torch
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
+sys.path.insert(1, '/home/s200640/thesis/src/')
 from utils import BoundingBox
 import config
+from torchvision.ops import box_iou, box_convert
 
 ''' 
 https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLOv3/utils.py
@@ -51,6 +52,20 @@ def intersectionOverUnion(
 
 
 # ------------------------------------------------------
+# Torch implementation to validate 
+# TODO: Replace own implementation with torch one
+def iou(preds: torch.tensor, labels: torch.tensor):
+
+    preds = box_convert(preds, in_fmt='cxcywh', out_fmt='xyxy')
+    labels = box_convert(labels, in_fmt='cxcywh', out_fmt='xyxy')
+
+    return box_iou(preds, labels).diag().reshape(-1, 1)
+
+    
+
+
+
+# ------------------------------------------------------
 if __name__ == '__main__':
 
     # l = [1, 2, 3, 4, 5]
@@ -70,7 +85,10 @@ if __name__ == '__main__':
     # box = [1, 2, 3, 4, 5]
     # iou = iouBetweenBboxAnchor(torch.tensor(box[2:4]), anch)
 
-    preds = torch.tensor([[2, 2, 2, 4], [0, 0, 1, 1]])
-    labels = torch.tensor([[2, 2, 3, 4], [20, 20, 1, 1]])    
+    preds = torch.tensor([[2, 2, 2, 4], [0, 0, 1, 1], [0, 0, 1, 1], [2, 2, 2, 4], [0, 0, 1, 1], [0, 0, 1, 1]])
+    labels = torch.tensor([[2, 2, 3, 4], [20, 20, 1, 1], [0, 0, 1, 1], [2, 2, 3, 4], [20, 20, 1, 1], [0, 0, 1, 1]])    
     iou1 = intersectionOverUnion(preds, labels)
     print(iou1)
+
+    iou2 = iou(preds, labels)
+    print(iou2)

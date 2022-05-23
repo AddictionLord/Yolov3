@@ -23,29 +23,16 @@ class TargetTensor:
 
     # ------------------------------------------------------
     # Computes loss with another list of tensors with given loss fcn
-    def computeLossWith(self, preds: list, loss_fcn):
+    def computeLossWith(self, preds: list, loss_fcn, debug=False):
 
-        targets, d = self.tensor, torch.device(config.DEVICE)
-        TargetTensor.passTargetsToDevice(preds, d)
-        TargetTensor.passTargetsToDevice(targets, d)
-
+        targets = self.tensor
         loss = 0
         for scale, (target, pred) in enumerate(zip(targets, preds)):
 
             # print(self.anchors)
-            loss += loss_fcn(pred, target, self.anchors[scale, ...])
+            loss += loss_fcn(pred, target, self.anchors[scale, ...], debug)
 
         return loss
-
-
-    # ------------------------------------------------------
-    # Sets all tensors in target to specific device
-    @staticmethod
-    def passTargetsToDevice(targets: list, device: [str, torch.device]):
-
-        for tensor in targets:
-
-            tensor.to(device)
 
 
     # ------------------------------------------------------
@@ -54,29 +41,39 @@ class TargetTensor:
     @classmethod
     def fromDataLoader(cls, anchors: list, targets: list):
 
-        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE)
+        anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64, device=config.DEVICE).requires_grad_(True)
         scales_cells = [targets[i].shape[2] for i, _ in enumerate(targets)]
         tt = cls(anchors, scales_cells)
-        tt.tensor = targets
+        tt.tensor = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
 
         return tt
 
 
-    # # ------------------------------------------------------
-    # # Compute BBs from models predictions (iterating over all the scales)
-    # def computeBoundingBoxesFromPreds(self):
+    # ------------------------------------------------------
+    # Compute BBs from models predictions (iterating over all the scales)
+    # Anchors should be normalized, unscaled, torch.tensor type
+    @staticmethod
+    def computeBoundingBoxesFromPreds(preds, anchors: torch.tensor, thresh, nms=True):
 
-    #     num_of_anchors = self.num_of_anchors_per_scale
-    #     bboxes = list()
-    #     for scale in range(len(self.cells)):
+        batch_bboxes = [torch.tensor([], device=config.DEVICE) for _ in range(preds[0].shape[0])]
+        for scale, pred_on_scale in enumerate(preds):
 
-    #         bboxes += TargetTensor.convertCellsToBoundingBoxes(
-    #             self.tensor[scale], True, self.anchors[scale]
-    #         )[0]
+            boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
+                pred_on_scale, True, anchors[scale]
+            )
+            for batch_img_id, (box) in enumerate(boxes_on_scale):
 
-    #         bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
+                batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
 
-    #     return bboxes
+        if nms:
+            # Now for every image in batch we need to NMS
+            for batch_img_id, boxes in enumerate(batch_bboxes):
+
+                batch_bboxes[batch_img_id] = nonMaxSuppression(
+                    boxes.unsqueeze(0), config.IOU_THRESHOLD, thresh
+                )[0]
+
+        return batch_bboxes
 
 
     # ------------------------------------------------------
@@ -97,7 +94,7 @@ class TargetTensor:
     # Takes one tensor for one scale and returns list of all BB
     # tensor: [BATCH, A, S, S, 6] -> 6: [score, x, y, w, h, classification]
     # !!!anchor should be in scaled_anchors form
-    # RETURNS list of lists(each for one image in batch) containing bboxes
+    # if thres RETURNS list of lists(each for one image in batch) containing bboxes
     @staticmethod
     def convertCellsToBoundingBoxes(tensor, fromPredictions, anchor=None, threshold=False):
 
@@ -140,6 +137,7 @@ class TargetTensor:
     @staticmethod
     def convertPredsToBoundingBox(tensor: torch.tensor, anchors: torch.tensor):
 
+        tensor = tensor.clone()
         anchors = anchors.reshape(1, len(anchors), 1, 1, 2) 
         tensor[..., 0:3] = torch.sigmoid(tensor[..., 0:3])
         tensor[..., 3:5] = torch.exp(tensor[..., 3:5]) * anchors

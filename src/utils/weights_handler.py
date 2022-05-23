@@ -1,3 +1,13 @@
+import torch
+from torch import nn
+import numpy as np
+
+import sys
+sys.path.insert(1, '/home/s200640/thesis/src/')
+
+# from blocks.scale_prediction_block import ScalePrediction
+
+
 '''
 Loading weights from PJ Redmon's darknet53.conv.74 file
 Inspiration/sources: 
@@ -5,17 +15,6 @@ Inspiration/sources:
     (Erik Lindernoren) https://github.com/eriklindernoren/PyTorch-YOLOv3/blob/e54d52e6500b7bbd687769f7abfd8581e9f59fd1/pytorchyolo/models.py#L199
     (Ayoosh Kathuria) https://github.com/ayooshkathuria/pytorch-yolo-v3/blob/master/darknet.py#L385
 '''
-
-
-
-
-# -------------------------------------------------------------------
-# -------------------------------------------------------------------
-import torch
-import torch.nn as nn
-import numpy as np
-
-
 
 
 # ------------------------------------------------------
@@ -50,3 +49,20 @@ class WeightsHandler:
         self.ptr += number_of_values
 
         return torch.from_numpy(weights)
+
+
+    # ------------------------------------------------------
+    @staticmethod
+    def initWeights(layer):
+
+        if isinstance(layer, nn.Conv2d):
+            nn.init.kaiming_uniform_(layer.weight, a=0.1)
+
+        elif isinstance(layer, nn.BatchNorm2d):
+            # nn.init.kaiming_uniform_(layer.weight, a=0.1)
+            layer.weight.data.fill_(1) if layer.affine else None
+            nn.init.zeros_(layer.bias) if layer.affine else None
+
+        # elif isinstance(layer, ScalePrediction):
+
+        #     print('\n\nScale')

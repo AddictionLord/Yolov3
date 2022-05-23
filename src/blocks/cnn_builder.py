@@ -2,10 +2,8 @@ import torch
 import torch.nn as nn
 import sys
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
-from blocks import CNNBlock
-from blocks import ResidualBlock
-from blocks import ScalePrediction
+sys.path.insert(1, '/s200640/thesis/src/')
+from blocks import CNNBlock, ResidualBlock, ScalePrediction
 
 
 darknet_config = [

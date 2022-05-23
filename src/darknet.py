@@ -34,6 +34,7 @@ class Darknet(nn.Module, CNNBuilder):
         self.concatenation = list()
 
         self.darknet = self._constructNeuralNetwork(self.config, in_channels)
+        self.darknet.apply(WeightsHandler.initWeights)
         self.loadPretrainedModel(self.weights_path) if pretrained else None
 
 
@@ -72,6 +73,18 @@ class Darknet(nn.Module, CNNBuilder):
     def getTensorToConcatenate(self):
 
         return self.concatenation.pop()
+
+
+    # ------------------------------------------------------
+    def evaluate(self): 
+
+        def turnOffRunningStats(layer):
+                
+            if isinstance(layer, nn.BatchNorm2d):
+
+                layer.track_running_stats = False
+
+        self.darknet.apply(turnOffRunningStats)
 
 
 
@@ -117,15 +130,52 @@ def showDarknetBlocks():
 # ------------------------------------------------------
 if __name__ == '__main__':
 
-    showDarknetBlocks()
-    testDarknetOutputSize()
+    # showDarknetBlocks()
+    # testDarknetOutputSize()
+
+    def seed_everything(seed=42):
+        import os, random
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    seed_everything()
+
+
+    t = torch.rand(1, 3, 255, 255, requires_grad=True)
+    d = Darknet(3, pretrained=True)
+    # d.evaluate()
+    d.eval()
+
+    out = d(t)
+
+    # print(type(d.darknet[0].block[1]))    
+    print(d.darknet[0].block[1].track_running_stats)    
+    # print(d.darknet[0].block[1].running_mean)    
+    # print(d.darknet[0].block[1].running_var)    
+
+
+    # print(out[0])
+
+
+
+
+
+
+
+    # bn = nn.BatchNorm2d(3, track_running_stats=False)
+    # print(bn.running_var)
+    # print(bn.running_mean)
 
     # t = torch.rand(1, 3, 255, 255, requires_grad=True)
-    # d = Darknet(3)
+    # out = bn(t)
 
-    # out = d(t)
-    # print(out.requires_grad)    
+    # print(bn.running_var)
+    # print(bn.running_mean)
 
-
-
-    
+    # print(out[0])
