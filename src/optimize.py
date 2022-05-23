@@ -16,13 +16,13 @@ if torch.cuda.is_available():
 def run(model: Yolov3, optimizer: torch.optim):
 
     t = YoloTrainer()
-    # container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('optim_Adam')
+    container = {'architecture': config.yolo_config}
+    # container = YoloTrainer.loadModel('rms_normal_loss')
     # t.trainNet(model, optimizer, load=container)
 
     try:
-        # t.trainNet(model, optimizer=algorithm)
-        t.trainNet(model, optimizer, load=container)
+        t.trainNet(model, optimizer=algorithm)
+        # t.trainNet(model, optimizer, load=container)
 
     except KeyboardInterrupt as e:
         print('[YOLO TRAINER]: KeyboardInterrupt', e)
@@ -81,17 +81,57 @@ def createModel():
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    adam_model = Yolov3(config.yolo_config)
-    adam = Adam(
+    # adam_model = Yolov3(config.yolo_config)
+    # adam = Adam(
+    #     [
+    #         {'params': adam_model.yolo.parameters()},
+    #         {'params': adam_model.darknet.parameters()}
+    #     ], 
+    #     lr=config.LEARNING_RATE
+    # )
+
+    # adagrad_model = Yolov3(config.yolo_config).to(config.DEVICE)
+    # adagrad = Adagrad(
+    #     [
+    #         {'params': adagrad_model.yolo.parameters()},
+    #         {'params': adagrad_model.darknet.parameters()}
+    #     ], 
+    #     lr=config.LEARNING_RATE
+    # )
+
+    rmsprop_model = Yolov3(config.yolo_config).to(config.DEVICE)
+    rmsprop = RMSprop(
         [
-            {'params': adam_model.yolo.parameters()},
-            {'params': adam_model.darknet.parameters()}
+            {'params': rmsprop_model.yolo.parameters()},
+            {'params': rmsprop_model.darknet.parameters()}
         ], 
         lr=config.LEARNING_RATE
     )
 
-    run(adam_model, adam)
+    run(rmsprop_model, rmsprop)
 
+
+    # sgd_model = Yolov3(config.yolo_config).to(config.DEVICE)
+    # sgd = SGD(
+    #     [
+    #         {'params': sgd_model.yolo.parameters()},
+    #         {'params': sgd_model.darknet.parameters()}
+    #     ], 
+    #     lr=config.LEARNING_RATE
+    # )
+
+    # run(sgd_model, sgd)
+
+    # adadelta_model = Yolov3(config.yolo_config).to(config.DEVICE)
+    # adadelta = Adadelta(
+    #     [
+    #         {'params': adadelta_model.yolo.parameters()},
+    #         {'params': adadelta_model.darknet.parameters()}
+    #     ], 
+    #     lr=config.LEARNING_RATE
+    # )
+
+    # run(rmsprop_model, rmsprop)
 
 
 

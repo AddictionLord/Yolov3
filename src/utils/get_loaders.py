@@ -55,8 +55,8 @@ def getLoaders(loadbar=True):
 def getValLoader(subset: list=None, loadbar=True):
     
     val_dataset = dataset.Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
+        config.full_val_imgs_path,
+        config.full_val_annots_path,
         config.ANCHORS,
         config.CELLS_PER_SCALE,
         config.NUM_OF_CLASSES,
