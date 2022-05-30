@@ -4,6 +4,9 @@ dataset/val2017
 dataset/instances_train2017.json
 dataset/instances_val2017.json
 
+models/optim/
+models/pretrained/
+
 __pycache__/
 .vscode/
 
