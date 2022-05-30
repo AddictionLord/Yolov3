@@ -14,7 +14,7 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 IMAGE_SIZE = 416
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 4
-BATCH_SIZE = 4
+BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True

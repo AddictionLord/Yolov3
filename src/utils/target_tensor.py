@@ -63,21 +63,21 @@ class TargetTensor:
         return tt
 
 
-    # ------------------------------------------------------
-    # Compute BBs from models predictions (iterating over all the scales)
-    def computeBoundingBoxesFromPreds(self):
+    # # ------------------------------------------------------
+    # # Compute BBs from models predictions (iterating over all the scales)
+    # def computeBoundingBoxesFromPreds(self):
 
-        num_of_anchors = self.num_of_anchors_per_scale
-        bboxes = list()
-        for scale in range(len(self.cells)):
+    #     num_of_anchors = self.num_of_anchors_per_scale
+    #     bboxes = list()
+    #     for scale in range(len(self.cells)):
 
-            bboxes += TargetTensor.convertCellsToBoundingBoxes(
-                self.tensor[scale], True, self.anchors[scale]
-            )[0]
+    #         bboxes += TargetTensor.convertCellsToBoundingBoxes(
+    #             self.tensor[scale], True, self.anchors[scale]
+    #         )[0]
 
-            bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
+    #         bboxes = nonMaxSuppression(bboxes, 0.5, 0.5)
 
-        return bboxes
+    #     return bboxes
 
 
     # ------------------------------------------------------
