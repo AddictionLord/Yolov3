@@ -25,7 +25,7 @@ def plot_image(image, boxes=None):
     cmap = plt.get_cmap("tab20b")
     class_labels = config.LABELS
     colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
-    im = np.array(image)
+    im = np.array(image, dtype=np.float32)
     # print(im.shape)
     height, width, _ = im.shape
 
