@@ -3,8 +3,9 @@ import matplotlib.patches as patches
 import numpy as np
 from PIL import Image, ImageFile
 import sys
+import torch
 
-sys.path.insert(1, '/home/mary/thesis/project/src/')
+sys.path.insert(1, '/home/s200640/thesis/src/')
 import config
 from dataset import Dataset
 
@@ -69,7 +70,10 @@ def plot_image(image, boxes=None):
 
 
 
+
 if __name__ == '__main__':
+
+    from dataset import Dataset
 
     anchors = config.ANCHORS
     transform = config.test_transforms

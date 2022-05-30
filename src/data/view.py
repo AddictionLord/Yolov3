@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import cm
 
 
 
@@ -10,12 +9,11 @@ class Visualizer:
     def __init__(self, filename):
 
         self.path = f'./models/train_data/{filename}.pkl'
-        # self.path = f'./models/optim/train_data/{filename}.pkl'
         self.data = pd.read_pickle(self.path)
 
         # self.data = self.data.iloc[:700]
-        # self.data = self.data.iloc[700:]
-        # print(f'[VISUALIZER]: Opening file ./models/train_data/{filename}.pkl')
+        # self.data = self.data.iloc[680:740]
+        print(f'[VISUALIZER]: Opening file ./models/train_data/{filename}.pkl')
         # print(data)
 
 
@@ -72,7 +70,6 @@ class Visualizer:
         mAP = mAP.drop('mar_10', axis=1)
         mAP = mAP.drop('mar_100', axis=1)
         mAP = mAP.drop('mar_large', axis=1)
-        mAP = mAP.drop('map_large', axis=1)
 
         print(mAP)
 
@@ -208,25 +205,20 @@ def loss_comparison():
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
-    # # v = Visualizer('transfer_learning_darknet_eval')
-    # # v = Visualizer('ultralytics_focal_loss')
-    # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
-    # # v = Visualizer('overfit_checkpoint')
+    # # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # # # v = Visualizer('transfer_learning_darknet_eval')
+    # v = Visualizer('ultralytics_focal_loss')
+    # # # v = Visualizer('transfer_learning_darknet_eval_checkpoint')
+    # # # v = Visualizer('overfit_checkpoint')
 
-    # # v = Visualizer('ultralytics_focal_loss_checkpoint')
-    # # v = Visualizer('optim_RMS_continue_checkpoint')
-    v = Visualizer('bleee272')
-    # print(v.data)
+    # v = Visualizer('optim_Adam')
+    # # # v = Visualizer('optim_RMS_continue_checkpoint')
+    v = Visualizer('yolo_model')
     
-    # v.viewLoss()
-    # v.viewAccuracy()
-    # v.view_lr()
-    v.overview()        
-
-    # loss_comparison()
-
-
+    
+    # # # v.viewLoss()
+    # # # v.viewAccuracy()
+    v.overview()
 
     # optims = [
     #     'optim_Adam_better',

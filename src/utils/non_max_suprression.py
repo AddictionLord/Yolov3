@@ -28,7 +28,7 @@ def nonMaxSuppression(bboxes: list, iou_thresh=0.5, prob_threshold=0.5) -> list:
 
         xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
         nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
-        b_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
+        filtered[batch_img_id] = torch.index_select(b_bboxes, dim=0, index=nms_indices)
 
     return filtered
 
@@ -39,6 +39,10 @@ def nonMaxSuppression(bboxes: list, iou_thresh=0.5, prob_threshold=0.5) -> list:
 def filterScoresUnder(bboxes, thresh=0.8):
 
     assert bboxes.shape[-1] == 6, 'Wrong bboxes format shape, [class, score, x, y, w, h] required'
+
+    if len(bboxes.shape) == 2:
+        bboxes = bboxes.unsqueeze(0)
+
     batch = bboxes.shape[0]
     condition = (bboxes[..., 1:2] >= thresh)
     condition = condition.repeat(1, 1, 1, 1, 6).reshape(batch, -1, 6)

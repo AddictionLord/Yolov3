@@ -1,16 +1,24 @@
 import torch
-from torch.optim import Adam, SGD
+from torch.optim import RAdam, Adam, SGD
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import warnings
 from tqdm import tqdm
+from pprint import pprint
+import pandas
+import copy
 
 import config
 from yolo import Yolov3
 from dataset import Dataset
 from loss import Loss
 
-from utils import getLoaders, TargetTensor, getBboxesToEvaluate, convertDataToMAP
 from thirdparty import plot_image
+from utils import (
+    getLoaders, getValLoader,
+    TargetTensor, 
+    TrainSupervisor
+)
 
 # warnings.filterwarnings("ignore")
 torch.backends.cudnn.benchmark = True
@@ -35,101 +43,221 @@ Saving and loading models:
 '''
 
 
+ 
+# ------------------------------------------------------
 class YoloTrainer:
-    def __init__(self):
+    def __init__(self, loaders=getLoaders()):
 
-        self.loss = Loss()
-        self.train_loader, self.val_loader = getLoaders() 
-        # self.train_loader = getLoaders()
+        self.loss = Loss(class_weights=True)
+
+        self.train_loader, self.val_loader = loaders
+        # self.train_loader, self.val_loader = getValLoader([2], False), getValLoader([2], False) 
+
         self.scaler = torch.cuda.amp.GradScaler() 
         self.scaled_anchors = config.SCALED_ANCHORS.to(config.DEVICE)
 
         self.model = None
         self.optimizer = None
 
-    
+
     # ------------------------------------------------------
-    # Method to train specific Yolo architecture and return model
-    def trainYoloNet(self, net: dict, load: bool=False):
+    def trainNet(self, model, optimizer, load=False, net=None):
 
         print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
-        self.model = Yolov3(net['architecture'])
-        self.model = self.model.to(config.DEVICE)
-        self.optimizer = Adam(self.model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-        self.mAP = MeanAveragePrecision()
-        
-        if load:
-            YoloTrainer.uploadParamsToModel(self.model, self.optimizer, net)
+        self.model = model.to(config.DEVICE)
+        self.optimizer = optimizer
 
-        w = self.model.yolo[0].block[0].weight.data.clone()
+        # self.model.yolo.apply(Yolov3.focalWeights)
+        # self.model.darknet.evaluate()
+        # self.model.darknet.eval()
+
+        self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
+
+        if load:
+            YoloTrainer.uploadParamsToModel(
+                load, self.model, supervisor=self.supervisor
+            )
+
+        # self.model.yolo.apply(Yolov3.focalWeights)
+        
+        # self.optimizer.add_param_group({'params': self.model.darknet.parameters()})
+        # print(self.optimizer.param_groups)
+
         for epoch in range(config.NUM_OF_EPOCHS):
 
-            self._train(self.model, self.optimizer)
-            if epoch != 0 and epoch % 20 == 0:
-                print(f'{epoch}/{config.NUM_OF_EPOCHS}')
-                self.model.eval()
-                # TODO: Implement evaluating fcns
-                # checkClassAccuracy()
-                # preds_bboxes, target_bboxes = getBboxesToEvaluate(
-                #     self.model, self.val_loader, anchors.copy(), device, config.PROBABILITY_THRESHOLD
-                # )
-                # preds, target = convertDataToMAP(preds_bboxes, target_bboxes)
-                # self.mAP.update(preds, target)
-                # self.model.train()
-                for g in self.optimizer.param_groups:
-                     g['lr'] /= 10
-                     print(f'learning rate modified: {g["lr"]}')
+            loss = self._train(self.model, self.optimizer)
 
-        print(w == self.model.yolo[0].block[0].weight.data)
+            if epoch % config.EVAL_EPOCH == 0 and epoch != 0:
+                val_loss = self._validate(self.model)
+                print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
+                mAP = self.supervisor.update(loss)
+                print(self.supervisor.data[[
+                    'epoch', 'learning_rate', 'loss', 'val_loss', 'map', 'map_50', 'map_75'
+                ]].tail(1))
 
+            else:
+                mAP = self.supervisor.update(loss)
+
+            if mAP > self.supervisor.best_mAP:
+                self.supervisor.best_mAP = mAP
+                YoloTrainer.saveModel(
+                    f'{self.supervisor.name}_checkpoint', 
+                    self.model, 
+                    self.optimizer, 
+                    self.supervisor
+                )
+            
         return self.model, self.optimizer
+
+
+    
+    # ------------------------------------------------------
+    # Method to train specific Yolo architecture and return model + optimizer
+    def trainYoloNet(self, net: dict, load: bool=False, optimizer=None):
+
+        print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
+        self.model = Yolov3(net['architecture'], pretrained=True)
+        self.model = self.model.to(config.DEVICE)
+        # self.model.darknet.evaluate()
+        # self.model.darknet.eval()
+        self.optimizer = Adam(
+            self.model.yolo.parameters(), 
+            # self.model.parameters(), 
+            config.LEARNING_RATE, 
+            # weight_decay=config.WEIGHT_DECAY
+        )
+        self.supervisor = TrainSupervisor(config.DEVICE, optimizer=self.optimizer)
+
+        if load:
+            YoloTrainer.uploadParamsToModel(
+                net, 
+                self.model, 
+                self.optimizer, 
+                supervisor=self.supervisor
+            )
+
+        # self.model.yolo.apply(Yolov3.focalWeights)
+
+
+        # TODO: DELETE - Just for single use
+        # for g in self.optimizer.param_groups:
+        #     g['lr'] = 0.001
+
+
+        for epoch in range(config.NUM_OF_EPOCHS):
+
+            loss = self._train(self.model, self.optimizer)
+
+            if epoch % 5 == 0 and epoch != 0:
+                val_loss = self._validate(self.model)
+                print(f'epochs: {epoch}/{config.NUM_OF_EPOCHS}, mean loss: {loss}')
+                mAP = self.supervisor.update(loss)
+                print(self.supervisor.data[[
+                    'epoch', 'learning_rate', 'loss', 'val_loss', 'map', 'map_50', 'map_75'
+                ]].tail(1))
+
+            else:
+                mAP = self.supervisor.update(loss)
+
+            if mAP > self.supervisor.best_mAP:
+                self.supervisor.best_mAP = mAP
+                YoloTrainer.saveModel(
+                    f'{self.supervisor.name}_checkpoint', 
+                    self.model, 
+                    self.optimizer, 
+                    self.supervisor
+                )
+            
+        return self.model, self.optimizer
+
+
+    # ------------------------------------------------------
+    def _validate(self, model: Yolov3):
+
+        model.darknet.eval()
+        model.yolo.eval()
+        val_losses = list()
+        loader = tqdm(self.val_loader)
+        for batch_id, (img, targets) in enumerate(loader):
+
+            with torch.no_grad():
+                preds = model(img.to(config.DEVICE).to(torch.float32))
+
+                anchors = torch.tensor(config.ANCHORS, dtype=torch.float16, device=config.DEVICE)
+                preds_bboxes = TargetTensor.computeBoundingBoxesFromPreds(
+                    copy.deepcopy(preds), anchors, thresh=0.49, nms=True
+                )
+                targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
+                target_bboxes = targets.getBoundingBoxesFromDataloader(1)
+
+                self.supervisor.updateMAP(preds_bboxes, target_bboxes)
+
+                val_loss = targets.computeLossWith(preds, self.loss, debug=True)
+                val_losses.append(val_loss)
+                running_mean = torch.mean(torch.tensor(val_losses)).item()
+
+                loader.set_postfix(loss=val_loss.item(), mean_loss=running_mean)
+
+        model.yolo.train()
+        self.supervisor.val_loss = running_mean
+        return running_mean
 
 
     # ------------------------------------------------------
     def _train(self, model: Yolov3, optimizer: torch.optim):
 
-        loader = tqdm(self.train_loader)
         losses = list()
+        loader = tqdm(self.train_loader)
         for batch, (img, targets) in enumerate(loader):
 
-            t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-            # img = img.to(torch.float16)
-            img = img.to(config.DEVICE)
-            targets = TargetTensor.fromDataLoader(self.scaled_anchors, t)
-            TargetTensor.passTargetsToDevice(targets.tensor, config.DEVICE)
+            optimizer.zero_grad()
+            model.zero_grad()
+            targets = TargetTensor.fromDataLoader(config.ANCHORS, targets)
             with torch.cuda.amp.autocast():
-                output = model(img)
-                loss = targets.computeLossWith(output, self.loss)
+                output = model(img.to(config.DEVICE))
+                loss = targets.computeLossWith(output, self.loss, debug=False)
 
             losses.append(loss.item())
-            optimizer.zero_grad()
 
             # AMP scaler, see docs. for more
             self.scaler.scale(loss).backward()
             self.scaler.step(optimizer)
             self.scaler.update()
 
-            loader.set_postfix(loss=torch.mean(torch.tensor(losses)).item())
+            running_mean = torch.mean(torch.tensor(losses)).item()
+            loader.set_postfix(loss=loss.item(), mean_loss=running_mean)
+
+        return running_mean
 
 
     # ------------------------------------------------------
     @staticmethod
-    def saveModel(model: Yolov3, optimizer: torch.optim, path: str="./models/test_model.pth.tar"):
+    def saveModel(
+        filename: str,
+        model: Yolov3, 
+        optimizer: torch.optim, 
+        supervisor: TrainSupervisor=None, 
+    ):
 
         container = {
-            "state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
+            "filename": f'{filename}.pth.tar',
             "architecture": model.config,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": supervisor.scheduler.state_dict(),
+            "train_data": supervisor.state_dict(filename)
         }
 
+        path = f'./models/{filename}.pth.tar'
         torch.save(container, path)
         print(f"[YOLO TRAINER]: Model saved to {path}")
 
 
     # ------------------------------------------------------
     @staticmethod
-    def loadModel(path: str="./models/test_model.pth.tar"):
+    def loadModel(filename: str="test_model"):
 
+        path = f'./models/{filename}.pth.tar'
         print(f"[YOLO TRAINER]: Loading model container {path}")
 
         return torch.load(path, map_location=config.DEVICE)
@@ -137,264 +265,39 @@ class YoloTrainer:
 
     # ------------------------------------------------------
     @staticmethod
-    def uploadParamsToModel(model: Yolov3, optimizer: torch.optim, params: dict):
+    def uploadParamsToModel(
+        params: dict, 
+        model: Yolov3, 
+        optimizer: torch.optim=None, 
+        supervisor: TrainSupervisor=None
+    ):
 
         print("[YOLO TRAINER]: Uploading parameter to model and optimizer")
-        model.load_state_dict(params['state_dict'])
-        optimizer.load_state_dict(params['optimizer'])
+        model.load_state_dict(params['model'])
+        if optimizer and 'optimizer' in params.keys():
+            optimizer.load_state_dict(params['optimizer'])
+
+        if supervisor and 'scheduler' in params.keys():
+            supervisor.scheduler.load_state_dict(params['scheduler'])
+
+        if supervisor and 'train_data' in params.keys():
+            supervisor.load_state_dict(params['train_data'])          
 
 
 
 
 # ------------------------------------------------------
-def overfitSingleBatch(batch_size: int=1, epochs: int=50, path: str='./models/batch_overfit1000.pth.tar', load='./models/Nbatch_overfit1000.pth.tar'):
-
-    from torch.utils.data.dataloader import DataLoader
-
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        config.test_transforms,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-    global pred
-    pred = torch.zeros([1, 3, 13, 13, 11], dtype=torch.float16, device=config.DEVICE)
-
-    print(f'[YOLO TRAINER]: Training on device: {config.DEVICE}')
-    model = Yolov3(config.yolo_config)
-    model = model.to(config.DEVICE)
-    optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-    # optimizer = SGD(model.parameters(), config.LEARNING_RATE, momentum=0.01)
-
-    container = YoloTrainer.loadModel(load)
-    YoloTrainer.uploadParamsToModel(model, optimizer, container)
-    loss_fcn = Loss()
-    scaler = torch.cuda.amp.GradScaler() 
-
-    img, targets = next(iter(val_loader))
-    # t = [torch.tensor(target, device=config.DEVICE) for target in targets]
-    t = [target.detach().clone().requires_grad_(True).to(config.DEVICE) for target in targets]
-    targets = TargetTensor.fromDataLoader(config.SCALED_ANCHORS.to(config.DEVICE), t)
-    img = img.to(torch.float16)
-    img = img.to(config.DEVICE)
-
-    print(targets[0].device)
-    print(img.device)
-    # losses = list()
-    model.train()
-    w = model.yolo[0].block[0].weight.data.clone()
-    print(f'Yolo weights req. grad: {model.yolo[0].block[0].weight.requires_grad}')
-    print(f'Darknet weights req. grad: {model.darknet.darknet[0].block[0].weight.requires_grad}')
-    for epoch in range(epochs):
-
-        print(f'epoch {epoch}/{epochs}')
-        with torch.autograd.detect_anomaly():
-            with torch.cuda.amp.autocast():
-                output = model(img)
-                print(f'Tensors are same: {torch.allclose(output[0], pred)}')
-                pred = output[0]
-                loss = targets.computeLossWith(output, loss_fcn)
-
-            # losses.append(loss.item())
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            optimizer.zero_grad()
-
-        print(f'actual loss: {loss.item()}')
-        # print(f'actual loss: {loss}, mean loss: {torch.mean(torch.tensor(losses)).item()}')
-
-    print(w == model.yolo[0].block[0].weight.data)
-    print(f'Do you want to save the model to: {path} [y/n]?')
-    if input() == 'y':
-        YoloTrainer.saveModel(model, optimizer, path)
-
-    return model, img
-
-
-# ------------------------------------------------------
-def plotDetections(model, loader, thresh, iou_thresh, anchors, preds=None):
-
-    from torchvision.ops import nms, box_convert
-
-    if isinstance(loader, torch.utils.data.DataLoader):
-        img, targets = next(iter(loader))
-        # plot_image(img[0].permute(1,2,0).detach().cpu())
-
-    else:
-        img = loader
-
-    model.eval()
-    img = img.to(config.DEVICE)
-    with torch.no_grad():
-
-        if preds is None:
-            preds = model(img)
-
-        batch_bboxes = [torch.tensor([]) for _ in range(img.shape[0])]
-        for scale, pred_on_scale in enumerate(preds):
-
-            mask = targets[scale][..., 0:1] == 1
-            print(torch.sum(pred_on_scale[..., 0:1][mask]))
-
-            boxes_on_scale = TargetTensor.convertCellsToBoundingBoxes(
-                pred_on_scale, True, anchors[scale], thresh
-            )
-            for batch_img_id, (box) in enumerate(boxes_on_scale):
-
-                batch_bboxes[batch_img_id] = torch.cat((batch_bboxes[batch_img_id], box), dim=0)
-
-        model.train()
-
-    for batch_img_id, b_bboxes in enumerate(batch_bboxes):
-
-        xyxy = box_convert(b_bboxes[..., 2:6], 'cxcywh', 'xyxy')
-        nms_indices = nms(xyxy, b_bboxes[..., 1], iou_thresh)
-        nms_bboxes = torch.index_select(b_bboxes, dim=0, index=nms_indices)
-        print(b_bboxes[..., 1:6])
-        plot_image(img[batch_img_id].permute(1,2,0).detach().cpu(), nms_bboxes)
-
-
-# ------------------------------------------------------------
-def createPerfectPredictionTensor(loader, scale):
-
-    image, target = next(iter(loader))
-    # plot_image(image[0].permute(1,2,0).detach().cpu())
-
-    condition = (target[scale][..., 0:1] == 1)
-    condition = condition.repeat(1, 1, 1, 1, 6)#.reshape(batch_size, -1, 6)
-    target[scale][condition].reshape(-1, 6)
-    # print(target[0][condition].reshape(-1, 6))
-
-    values_idx = (target[scale][..., 0:1] == 1).nonzero()
-    values_idx = values_idx[..., 2:4].tolist()
-
-    preds = target.copy()
-    preds[0] = torch.zeros(1, 3, 13, 13, 11)
-    preds[1] = torch.zeros(1, 3, 13, 13, 11)
-    preds[2] = torch.zeros(1, 3, 13, 13, 11)
-    preds[0][..., 0:3] = inv_sig(target[0][..., 0:3])
-    # preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2))
-    preds[0][..., 3:5] = torch.log(1e-16 + target[0][..., 3:5] / scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2))
-    # torch.log(1e-16 + target[..., 3:5] / anchors)
-    preds[0][0, 0, 6, 7, 5] = 6
-    preds[0][0, 0, 6, 8, 5] = 6
-
-    print(preds[0][0, 0, 6, 7, 5])
-    print(preds[0][0, 0, 6, 8, 5])
-
-
-    back_target = target.copy()
-    back_target[0][..., 0:3] = torch.sigmoid(preds[0][..., 0:3])
-    # back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * torch.tensor(anchors[0]).reshape(1, 3, 1, 1, 2)
-    back_target[0][..., 3:5] = torch.exp(preds[0][..., 3:5]) * scaled_anchors[0, ...].reshape(1, 3, 1, 1, 2)
-    back_target[0][..., 5] = torch.argmax(preds[0][..., 5:], dim=-1)
-
-    # print(torch.argmax(preds[0][..., 5:], dim=-1))
-    # print(target[0][0, 0, 6, 7, ...])
-    # print(back_target[0][0, 0, 6, 7, ...])
-
-    return preds, image
-
-
-# ------------------------------------------------------------
-def inspectPred(model, loader):
-
-    img, target = next(iter(loader))
-    img = img.to(device)
-    model = model.to(device)
-    model.train()
-
-    with torch.no_grad():
-
-        out = model(img)
-
-    out[0], _ = TargetTensor.convertPredsToBoundingBox(out[0], config.SCALED_ANCHORS[0])
-    classes = torch.argmax(out[0][..., 5:], dim=-1).unsqueeze(-1)
-
-    b = torch.cat((classes, out[0][..., 0:5]), dim=-1)
-    fltr = b[..., 1] > 0.01
-    print(fltr.nonzero().tolist())
-    print(b[fltr])
-
-    # print(out[0][0, 0, 6, 7, 5:])
-    print(b[0, 0, 6, 7, ...])
-    print(b[0, 0, 6, 8, ...])
-
-
-
-
-
-
 if __name__ == '__main__':
 
-    import config
-    import torch
-    from yolo import Yolov3
-    from dataset import Dataset
-    from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
-    from yolo_trainer import YoloTrainer
-
-    device = torch.device(DEVICE)
-    transform = config.test_transforms
-    val_img = config.val_imgs_path
-    val_annots = config.val_annots_path    
-    train_img = config.train_imgs_path
-    train_annots = config.train_annots_path
-    scaled_anchors = config.SCALED_ANCHORS
-    batch_size = 4
-
-    def inv_sig(x):
-        return -torch.log((1 / x) - 1)
-
-    val_dataset = Dataset(
-        config.val_imgs_path,
-        config.val_annots_path,
-        config.ANCHORS,
-        config.CELLS_PER_SCALE,
-        config.NUM_OF_CLASSES,
-        transform=transform
-        # config.test_transforms,
-    )
-    img = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        num_workers=config.NUM_WORKERS,
-        pin_memory=config.PIN_MEMORY,
-        shuffle=False,
-        drop_last=False,
-    )
-
-    # model, img = overfitSingleBatch(batch_size, 50, path='Nbatch_overfit1000.pth.tar', load='./models/gpu_darknet.pth.tar')
-
-    # plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
-
-
-    # ------------------------------------------------------------
-    # Test of plotting fcns and bbox calculations 
-
-    # preds, image = createPerfectPredictionTensor(loader, 0)
-
-    # plotDetections(model, image, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS, preds)
+    # from config import DEVICE, PROBABILITY_THRESHOLD as threshold, ANCHORS as anchors
 
 
 
     # ------------------------------------------------------------
+    # t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
     t = YoloTrainer()
     container = {'architecture': config.yolo_config}
-    container = YoloTrainer.loadModel('./models/gpu_training_overnight.pth.tar')
+    container = YoloTrainer.loadModel('uflc_config_mod')
 
     try:
         t.trainYoloNet(container, load=True)
@@ -407,63 +310,20 @@ if __name__ == '__main__':
         print(e)
 
     finally:
-        saved = t.model.parameters()
-        YoloTrainer.saveModel(t.model, t.optimizer, "./models/stable_test2.pth.tar")
+        pass
+        YoloTrainer.saveModel("uflc_config_mod", t.model, t.optimizer, t.supervisor)
 
 
 
 
+    # ------------------------------------------------------------
+    # # t = YoloTrainer((getValLoader([25, 30, 35, 40, 45]), getValLoader([25, 30, 35, 40, 45])))
+    # t = YoloTrainer()
+    # container = {'architecture': config.yolo_config}
 
-
-
-
-
-
-
-    # -----------------------------------------------------
-    # params = YoloTrainer.loadModel("./models/test_model.pth.tar")
-
-    # model = Yolov3(params['architecture'])
-    # optimizer = Adam(model.parameters(), config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-
-    # YoloTrainer.uploadParamsToModel(model, optimizer, params)
-    # loaded = model.parameters()
-
-    # for parama, paramb in zip(saved, loaded):
-
-    #     a = parama
-    #     b = paramb
-
-    #     if torch.rand(1).item() > 0.7:
-    #         break
-
-    # print(f'Loaded and saved parameter are same: {torch.allclose(a, b)}')
-        
+    # container = YoloTrainer.loadModel('ultralytics_focal_loss_box')
+    # t.trainYoloNet(container, load=True)
     
-
-
-
-
-    # model = Yolov3(config.yolo_config)
-    # container = YoloTrainer.loadModel('models/gpu_mse_loss.pth.tar')
-    # model.load_state_dict(container['state_dict'])
-
-    # d = Dataset(val_img, val_annots, anchors, transform=transform)
-    # # val_loader = torch.utils.data.DataLoader(d, batch_size=1, shuffle=False)
-    # val_loader = torch.utils.data.DataLoader(d, batch_size=config.BATCH_SIZE, shuffle=False)
-
-    # # plotDetections(model, val_loader, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
-
-    # # img, targets = next(iter(val_loader))
-    # # plotDetections(model, img, config.PROBABILITY_THRESHOLD, config.IOU_THRESHOLD, config.SCALED_ANCHORS)
-
-
-
-    
-
-
-
-
-
+    # # t.trainYoloNet(container)
 
 
