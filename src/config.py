@@ -11,29 +11,36 @@ https://sannaperzon.medium.com/yolov3-implementation-with-training-setup-from-sc
 
 
 # ------------------------------------------------------
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 IMAGE_SIZE = 416
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 4
-BATCH_SIZE = 4
+BATCH_SIZE = 1
 CELLS_PER_SCALE = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 NUM_OF_CLASSES = 6
 PIN_MEMORY = True
-NUM_OF_EPOCHS = 100
+NUM_OF_EPOCHS = 15000
 LEARNING_RATE = 1e-5
 WEIGHT_DECAY = 1e-4
-LAMBDA_COORD = 5 #10
+LAMBDA_COORD = 10 #10
 LAMBDA_NOOBJ = 0.5 #10
-
+PROBABILITY_THRESHOLD = 0.8
+IOU_THRESHOLD = 0.5
 
 
 
 
 # ------------------------------------------------------
 # Paths
+# val_imgs_path = r'dataset/balanced/val2017'
+# val_annots_path = r'dataset/balanced/instances_val2017.json'
+train_imgs_path = r'dataset/balanced/train2017'
+train_annots_path = r'dataset/balanced/instances_train2017.json'
+
 val_imgs_path = r'dataset/val2017'
 val_annots_path = r'dataset/instances_val2017.json'
-train_imgs_path = r'dataset/train2017'
-train_annots_path = r'dataset/instances_train2017.json'
+# train_imgs_path = r'dataset/train2017'
+# train_annots_path = r'dataset/instances_train2017.json'
+
 
 darknet53_path = 'models/pretrained/darknet53.conv.74'
 
@@ -242,22 +249,27 @@ LABELS_INDICES = [COCO_LABELS.index(label) for label in LABELS]
 
 if __name__ == '__main__':
 
-    t = torch.tensor([0, 1, 2, 3, 5, 17, 17, 17])
+    # t = torch.tensor([0, 1, 2, 3, 5, 17, 17, 17])
+    # print(t)
+    # seventeen = torch.where(t == 17)
+    # t[seventeen] = 4
+    # print(t)
+
+
+    # indices = list()
+    # for label in LABELS:
+
+    #     indices.append(COCO_LABELS.index(label))
+
+    # indices = [COCO_LABELS.index(label) for label in LABELS] 
+    # print(indices)
+
+    # print(LABELS_INDICES.index(17))
+
+
+    t = torch.tensor(ANCHORS, device=DEVICE)
+
+    t = torch.tensor(ANCHORS[0] + ANCHORS[1] + ANCHORS[2], dtype=torch.float64)
     print(t)
-    seventeen = torch.where(t == 17)
-    t[seventeen] = 4
-    print(t)
-
-
-    indices = list()
-    for label in LABELS:
-
-        indices.append(COCO_LABELS.index(label))
-
-    indices = [COCO_LABELS.index(label) for label in LABELS] 
-    print(indices)
-
-    print(LABELS_INDICES.index(17))
-
 
 

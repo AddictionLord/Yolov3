@@ -7,6 +7,7 @@ import os
 
 import config
 from utils import iouBetweenBboxAnchor, nonMaxSuppression, BoundingBox, TargetTensor
+from thirdparty import plot_image
 
 
 '''
@@ -26,7 +27,7 @@ class Dataset(CocoDetection):
         self.root = root
         self.annFile = annFile
 
-        self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float64)
+        self.anchors = torch.tensor(anchors[0] + anchors[1] + anchors[2], dtype=torch.float16)
         self.S = S
         self.C = C
         self.transform = transform
@@ -92,7 +93,7 @@ class Dataset(CocoDetection):
                 elif not anchor_present and ious[iou_idx] > self.iou_thresh:
                     targets.setProbabilityToCell(cx, cy, -1)
 
-        return image, tuple(targets)
+        return image.to(torch.float16), tuple(targets.tensor)
 
 
 
@@ -110,60 +111,15 @@ def test(data_path, annots_path):
     for image, targets in train_loader:
 
         target = TargetTensor.fromDataLoader(scaled_anchors, targets)
-        bboxes = target.computeBoundingBoxes(fromPredictions=False)
+        bboxes = target.getBoundingBoxesFromDataloader(2)
 
-        plot_image(image[0].permute(1, 2, 0).to('cpu'), bboxes)
+        batch_size = image.shape[0]
+        for batch_img in range(batch_size):
+            
+            plot_image(image[batch_img].permute(1, 2, 0).to('cpu'), bboxes[batch_img])
 
 
-# ------------------------------------------------------
-# Bboxes in midpoint format
-def plot_image(image, boxes):
 
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
-
-    cmap = plt.get_cmap("tab20b")
-    class_labels = config.LABELS
-    colors = [cmap(i) for i in np.linspace(0, 1, len(class_labels))]
-    im = np.array(image)
-    # print(im.shape)
-    height, width, _ = im.shape
-
-    # Create figure and axes
-    fig, ax = plt.subplots(1)
-    # Display the image
-    ax.imshow(im)
-
-    # box[0] is x midpoint, box[2] is width
-    # box[1] is y midpoint, box[3] is height
-
-    # Create a Rectangle patch
-    for box in boxes:
-        assert len(box) == 6, "box should contain class pred, confidence, x, y, width, height"
-        class_pred = box[0] - 1
-        box = box[2:]
-        upper_left_x = box[0] - box[2] / 2
-        upper_left_y = box[1] - box[3] / 2
-        rect = patches.Rectangle(
-            (upper_left_x * width, upper_left_y * height),
-            box[2] * width,
-            box[3] * height,
-            linewidth=2,
-            edgecolor=colors[int(class_pred)],
-            facecolor="none",
-        )
-        # Add the patch to the Axes
-        ax.add_patch(rect)
-        plt.text(
-            upper_left_x * width,
-            upper_left_y * height,
-            s=class_labels[int(class_pred)],
-            color="white",
-            verticalalignment="top",
-            bbox={"color": colors[int(class_pred)], "pad": 0},
-        )
-
-    plt.show()
 
 
 # ------------------------------------------------------
